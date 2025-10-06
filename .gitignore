@@ -1,3 +1,6 @@
+# Ignore secrets and config files
+src/main/resources/application.properties
+.env
 HELP.md
 target/
 .mvn/wrapper/maven-wrapper.jar
