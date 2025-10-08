@@ -20,6 +20,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import DTO.TestimonialDTO;
+import model.BrandProfile;
 
 @Service
 public class LLMService {
@@ -31,7 +32,8 @@ public class LLMService {
 
 	private final ObjectMapper mapper = new ObjectMapper();
 	
-	public TestimonialDTO generate(String inputText, String platform, String postType, int tone, int style) {
+	public TestimonialDTO generate(String inputText, String platform, String postType,
+			int emotion, int creativity, int formality, int urgency, int length, BrandProfile brandProfile) {
 	    RestTemplate restTemplate = new RestTemplate();
 
 	    String styleHint = switch (platform.toLowerCase()) {
@@ -40,36 +42,30 @@ public class LLMService {
 	        default -> "Crea un post professionale per LinkedIn con tono autorevole ma umano";
 	    };
 
-	    String prompt = """
-	        Genera da questa testimonianza un contenuto ottimizzato per %s.
-	        Tipo di post: "%s"
-	        Tono (0-100): "%d"
-	        Stile (0-100): "%d"
-	        
-	        Testimonianza: "%s"
+	 // ✅ BUILD BRAND-AWARE PROMPT
+        String brandContext = buildBrandContext(brandProfile);
+        
+        // ✅ CORRETTO: brandContext inserito nel template con %s
+        String prompt = """
+            %s
+            
+            %s
+            
+            Genera da questa testimonianza un contenuto ottimizzato per %s.
+            Tipo di post: "%s"
+            Emozione (0-100): "%d"
+            Creatività (0-100): "%d"
+            Formalità (0-100): "%d"
+            Urgenza (0-100): "%d"
+            Lunghezza (0-100): "%d"
+            
+            Testimonianza: "%s"
 
-	        ⚠️ Rispondi SOLO con JSON valido (senza testo o commenti esterni).
+            ⚠️ Rispondi SOLO con JSON valido (senza testo o commenti esterni).
             ⚠️ Ogni campo deve contenere ESATTAMENTE 3 versioni, numerate da 1 a 3.
-            Esempio di formato JSON atteso:
-	        {
-	          "linkedinPostVersions": [
-	            "Versione 1",
-	            "Versione 2",
-	            "Versione 3"
-	          ],
-	          "headlineVersions": [
-	            "Versione 1",
-	            "Versione 2",
-	            "Versione 3"
-	          ],
-	          "shortQuoteVersions": [
-	            "Versione 1",
-	            "Versione 2",
-	            "Versione 3"
-	          ]
-	        }
-	        """.formatted(platform, postType, tone, style, inputText);
-
+            """.formatted(brandContext, styleHint, platform, postType, emotion, creativity, 
+                         formality, urgency, length, inputText);
+        
 	    HttpHeaders headers = new HttpHeaders();
 	    headers.setContentType(MediaType.APPLICATION_JSON);
 	    headers.setBearerAuth(groqApiKey);
@@ -96,6 +92,44 @@ public class LLMService {
 	    dto.setShortQuoteVersions(extractList(content, "shortQuoteVersions"));
 	    return dto;
 	}
+	
+	 private String buildBrandContext(BrandProfile brand) {
+	        if (brand == null) {
+	            return "CONTESTO BRAND: Nessun profilo brand specificato. Usa un tono generico e professionale.";
+	        }
+	        
+	        return String.format("""
+	            CONTESTO BRAND SPECIFICO:
+	            Nome Brand: %s
+	            Tono di voce: %s
+	            Valori del brand: %s
+	            Target audience: %s
+	            Parole chiave preferite: %s
+	            Parole da evitare: %s
+	            Tagline: %s
+	            Hashtag predefiniti: %s
+
+	            ISTRUZIONI IMPORTANTI:
+	            - Mantieni assoluta coerenza con il tono %s
+	            - Usa le parole chiave indicate dove appropriato
+	            - EVITA ASSOLUTAMENTE queste parole: %s
+	            - Incorpora la tagline quando rilevante
+	            - Usa gli hashtag suggeriti nel formato appropriato
+	            - Il contenuto deve risuonare con: %s
+	            """,
+	            brand.getBrandName(),
+	            brand.getTone().toString(),
+	            brand.getBrandValues(),
+	            brand.getTargetAudience(),
+	            String.join(", ", brand.getPreferredKeywords()),
+	            String.join(", ", brand.getAvoidedWords()),
+	            brand.getTagline(),
+	            String.join(" ", brand.getDefaultHashtags()),
+	            brand.getTone().toString(),
+	            String.join(", ", brand.getAvoidedWords()),
+	            brand.getTargetAudience()
+	        );
+	    }
 
     private String extract(String text, String key) {
     	 try {

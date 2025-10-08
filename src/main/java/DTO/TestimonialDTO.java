@@ -15,8 +15,12 @@ public class TestimonialDTO {
     private LocalDateTime createdAt;
     private String platform;
     private String selectedPostType;
-    private int toneValue;
-    private int styleValue;
+    private int emotion;
+    private int creativity;
+    private int formality;
+    private int urgency;
+    private int length;
+    private String brandProfileId;
     
 	public String getId() {
 		return id;
@@ -86,18 +90,43 @@ public class TestimonialDTO {
 	public void setSelectedPostType(String selectedPostType) {
 		this.selectedPostType = selectedPostType;
 	}
-	public int getToneValue() {
-		return toneValue;
+	public int getEmotion() {
+		return emotion;
 	}
-	public void setToneValue(int toneValue) {
-		this.toneValue = toneValue;
+	public void setEmotion(int emotion) {
+		this.emotion = emotion;
 	}
-	public int getStyleValue() {
-		return styleValue;
+	public int getCreativity() {
+		return creativity;
 	}
-	public void setStyleValue(int styleValue) {
-		this.styleValue = styleValue;
+	public void setCreativity(int creativity) {
+		this.creativity = creativity;
 	}
+	public int getFormality() {
+		return formality;
+	}
+	public void setFormality(int formality) {
+		this.formality = formality;
+	}
+	public int getUrgency() {
+		return urgency;
+	}
+	public void setUrgency(int urgency) {
+		this.urgency = urgency;
+	}
+	public int getLength() {
+		return length;
+	}
+	public void setLength(int length) {
+		this.length = length;
+	}
+	public String getBrandProfileId() {
+		return brandProfileId;
+	}
+	public void setBrandProfileId(String brandProfileId) {
+		this.brandProfileId = brandProfileId;
+	}
+	
 
    
 }

@@ -13,10 +13,12 @@ import org.springframework.web.bind.annotation.RestController;
 
 import DTO.TestimonialDTO;
 import DTO.UserDTO;
+import Service.BrandProfileService;
 import Service.LLMService;
 import Service.TestimonialService;
 import Service.UserService;
 import mapper.DtoMapper;
+import model.BrandProfile;
 import model.Testimonial;
 import model.User;
 
@@ -27,13 +29,16 @@ public class TestimonialController {
     private final TestimonialService testimonialService;
     private final LLMService llmService;
     private final UserService userService;
-
+    private final BrandProfileService brandService;
+    
     public TestimonialController(TestimonialService testimonialService,
                                  LLMService llmService,
-                                 UserService userService) {
+                                 UserService userService,
+                                 BrandProfileService brandService) {
         this.testimonialService = testimonialService;
         this.llmService = llmService;
         this.userService = userService;
+        this.brandService= brandService;
     }
 
     @PostMapping("/generate")
@@ -54,9 +59,36 @@ public class TestimonialController {
         if (req.getPlatform() == null || req.getPlatform().isBlank())
             req.setPlatform("linkedin");
 
+        // ✅ NUOVO: Recupera Brand Profile se specificato
+        BrandProfile brandProfile = null;
+        if (req.getBrandProfileId() != null) {
+        	 try {
+                 Long brandId = Long.valueOf(req.getBrandProfileId());
+                 Optional<BrandProfile> brandProfileOpt  = brandService.findByIdAndUser(brandId, user);
+                 if (brandProfileOpt.isEmpty()) {
+                	    return ResponseEntity.notFound().build();
+                	}
+                	 brandProfile = brandProfileOpt.get();
+        	 } catch (NumberFormatException e) {
+                 return ResponseEntity.badRequest().build();
+             }
+            // Verifica che il brand appartenga all'utente
+            if (!brandProfile.getUser().getId().equals(user.getId())) {
+                return ResponseEntity.status(403).build();
+            }
+        }
+        
         // mock LLM call
-        TestimonialDTO gen = llmService.generate(req.getInputText(), req.getPlatform(), 
-        		req.getSelectedPostType(), req.getToneValue(), req.getStyleValue());
+        TestimonialDTO gen = llmService.generate(
+        		req.getInputText(),
+        		req.getPlatform(), 
+        		req.getSelectedPostType(),
+        		req.getEmotion(),
+        		req.getCreativity(),
+        		req.getFormality(),
+        		req.getUrgency(),
+        		req.getLength(),
+        		brandProfile);
         
         Testimonial t = new Testimonial();
         t.setUser(user);

@@ -1,0 +1,13 @@
+package Enums;
+
+public enum IndustryType {
+	TECH_SAAS,
+    FASHION_BELLEZZA,
+    SALUTE_FITNESS,
+    FOOD_BEVERAGE,
+    FINANZA,
+    EDUCAZIONE,
+    INTRATTENIMENTO,
+    IMMOBILIARE,
+    NON_PROFIT
+}
