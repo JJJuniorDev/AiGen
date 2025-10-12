@@ -23,9 +23,10 @@ public class DtoMapper {
         dto.setId(t.getId().toString());
         dto.setUserId(t.getUser().getId().toString());
         dto.setInputText(t.getInputText());
-        dto.setLinkedinPostVersions(t.getLinkedinPostVersions());
+        dto.setSocialPostVersions(t.getSocialPostVersions());
         dto.setHeadlineVersions(t.getHeadlineVersions());
         dto.setShortQuoteVersions(t.getShortQuoteVersions());
+        dto.setCallToActionVersions(t.getCallToActionVersions());
         dto.setExportedMd(t.isExportedMd());
         dto.setExportedPng(t.isExportedPng());
         dto.setCreatedAt(t.getCreatedAt());

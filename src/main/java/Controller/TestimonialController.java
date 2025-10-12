@@ -93,9 +93,10 @@ public class TestimonialController {
         Testimonial t = new Testimonial();
         t.setUser(user);
         t.setInputText(req.getInputText());
-        t.setLinkedinPostVersions(gen.getLinkedinPostVersions());
+        t.setSocialPostVersions(gen.getSocialPostVersions());
         t.setHeadlineVersions(gen.getHeadlineVersions());
         t.setShortQuoteVersions(gen.getShortQuoteVersions());
+        t.setCallToActionVersions(gen.getCallToActionVersions());
         t.setCreatedAt(LocalDateTime.now());
 
         Testimonial saved = testimonialService.save(t);

@@ -1,20 +1,20 @@
 package DTO;
 
 public class GenerationResponse {
-    private String linkedinPost;
+    private String socialPost;
     private String headline;
     private String shortQuote;
 
     public GenerationResponse() {}
 
-    public GenerationResponse(String linkedinPost, String headline, String shortQuote) {
-        this.linkedinPost = linkedinPost;
+    public GenerationResponse(String socialPost, String headline, String shortQuote) {
+        this.socialPost = socialPost;
         this.headline = headline;
         this.shortQuote = shortQuote;
     }
 
-    public String getLinkedinPost() { return linkedinPost; }
-    public void setLinkedinPost(String linkedinPost) { this.linkedinPost = linkedinPost; }
+    public String getSocialPost() { return socialPost; }
+    public void setSocialPost(String socialPost) { this.socialPost = socialPost; }
 
     public String getHeadline() { return headline; }
     public void setHeadline(String headline) { this.headline = headline; }

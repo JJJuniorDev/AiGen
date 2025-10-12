@@ -1,6 +1,7 @@
 package model;
 
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
 
 import Enums.ToneType;
@@ -68,6 +69,16 @@ public class BrandProfile {
 
     private LocalDateTime createdAt = LocalDateTime.now();
     private LocalDateTime updatedAt = LocalDateTime.now();
+    
+    @ElementCollection
+    private List<String> preferredCTAs = Arrays.asList("Scopri di più", "Contattaci", "Inizia ora");
+    
+    private String positioning;
+    
+    
+    
+    
+    
 	public Long getId() {
 		return id;
 	}
@@ -157,6 +168,18 @@ public class BrandProfile {
 	}
 	public void setUpdatedAt(LocalDateTime updatedAt) {
 		this.updatedAt = updatedAt;
+	}
+	public List<String> getPreferredCTAs() {
+		return preferredCTAs;
+	}
+	public void setPreferredCTAs(List<String> preferredCTAs) {
+		this.preferredCTAs = preferredCTAs;
+	}
+	public String getPositioning() {
+		return positioning;
+	}
+	public void setPositioning(String positioning) {
+		this.positioning = positioning;
 	}
     
     

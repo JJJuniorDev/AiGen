@@ -33,19 +33,24 @@ public class Testimonial {
 
     @ElementCollection
     @CollectionTable(name = "testimonial_linkedin_versions", joinColumns = @JoinColumn(name = "testimonial_id"))
-    @Column(name = "version")
-    private List<String> linkedinPostVersions;
+    @Column(name = "version" , length = 3000)
+    private List<String> socialPostVersions;
     
     @ElementCollection
     @CollectionTable(name = "testimonial_headline_versions", joinColumns = @JoinColumn(name = "testimonial_id"))
-    @Column(name = "version")
+    @Column(name = "version" , length = 3000)
     private List<String> headlineVersions;
     
     @ElementCollection
     @CollectionTable(name = "testimonial_shortquote_versions", joinColumns = @JoinColumn(name = "testimonial_id"))
-    @Column(name = "version")
+    @Column(name = "version", length = 3000)
     private List<String> shortQuoteVersions;
 
+    @ElementCollection
+    @CollectionTable(name = "testimonial_calltoaction_versions", joinColumns = @JoinColumn(name = "testimonial_id"))
+    @Column(name = "version", length = 3000)
+    private List<String> callToActionVersions;
+    
     private boolean exportedMd = false;
     private boolean exportedPng = false;
 
@@ -76,12 +81,12 @@ public class Testimonial {
 	}
 
 
-	public List<String> getLinkedinPostVersions() {
-		return linkedinPostVersions;
+	public List<String> getSocialPostVersions() {
+		return socialPostVersions;
 	}
 
-	public void setLinkedinPostVersions(List<String> linkedinPostVersions) {
-		this.linkedinPostVersions = linkedinPostVersions;
+	public void setSocialPostVersions(List<String> socialPostVersions) {
+		this.socialPostVersions = socialPostVersions;
 	}
 
 	public List<String> getHeadlineVersions() {
@@ -122,6 +127,14 @@ public class Testimonial {
 
 	public void setCreatedAt(LocalDateTime createdAt) {
 		this.createdAt = createdAt;
+	}
+
+	public List<String> getCallToActionVersions() {
+		return callToActionVersions;
+	}
+
+	public void setCallToActionVersions(List<String> callToActionVersions) {
+		this.callToActionVersions = callToActionVersions;
 	}
 
    

@@ -1,13 +1,14 @@
 package DTO;
 
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
 
 public class TestimonialDTO {
     private String id;
     private String userId;
     private String inputText;
-    private List<String> linkedinPostVersions;
+    private List<String> socialPostVersions;
     private List<String> headlineVersions;
     private List<String> shortQuoteVersions;
     private boolean exportedMd;
@@ -21,6 +22,8 @@ public class TestimonialDTO {
     private int urgency;
     private int length;
     private String brandProfileId;
+    private List<String> callToActionVersions;
+    
     
 	public String getId() {
 		return id;
@@ -41,11 +44,11 @@ public class TestimonialDTO {
 		this.inputText = inputText;
 	}
 	
-	public List<String> getLinkedinPostVersions() {
-		return linkedinPostVersions;
+	public List<String> getSocialPostVersions() {
+		return socialPostVersions;
 	}
-	public void setLinkedinPostVersions(List<String> linkedinPostVersions) {
-		this.linkedinPostVersions = linkedinPostVersions;
+	public void setSocialPostVersions(List<String> socialPostVersions) {
+		this.socialPostVersions = socialPostVersions;
 	}
 	public List<String> getHeadlineVersions() {
 		return headlineVersions;
@@ -128,5 +131,11 @@ public class TestimonialDTO {
 	}
 	
 
-   
+	public List<String> getCallToActionVersions() {
+        return callToActionVersions != null ? callToActionVersions : Arrays.asList("Scopri di più", "Contattaci", "Inizia ora");
+    }
+    
+    public void setCallToActionVersions(List<String> callToActionVersions) {
+        this.callToActionVersions = callToActionVersions;
+    }
 }

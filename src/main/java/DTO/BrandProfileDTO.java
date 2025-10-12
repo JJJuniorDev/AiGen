@@ -16,6 +16,14 @@ public class BrandProfileDTO {
     private List<String> defaultHashtags;
     private String visualStyle;
     private String colorPalette;
+   
+    
+    
+    
+    
+    
+    
+    
 	public String getBrandName() {
 		return brandName;
 	}
@@ -82,6 +90,6 @@ public class BrandProfileDTO {
 	public void setColorPalette(String colorPalette) {
 		this.colorPalette = colorPalette;
 	}
-
+	
     
 }

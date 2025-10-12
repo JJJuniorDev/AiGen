@@ -29,6 +29,8 @@ public class AuthController {
         this.userService = userService;
         this.jwtUtil = jwtUtil;
     }
+    
+  
 
     @PostMapping("/signup")
     public ResponseEntity<UserDTO> signup(@RequestBody AuthRequest req) {
