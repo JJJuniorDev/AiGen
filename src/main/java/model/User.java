@@ -26,7 +26,17 @@ public class User {
     private String primaryColor;
 
     private LocalDateTime createdAt = LocalDateTime.now();
+    private LocalDateTime updatedAt = LocalDateTime.now();
+    
+    // ✅ NUOVI CAMPI
+    @Column(nullable = false)
+    private Integer maxBrands = 3; // Limite brand per piano FREE
 
+    @Column(nullable = false)
+    private Boolean active = true;
+
+    private String stripeCustomerId; // Per i pagamenti
+    
 	public Long getId() {
 		return id;
 	}
@@ -91,5 +101,56 @@ public class User {
 		this.createdAt = createdAt;
 	}
 
-    
+	public Integer getMaxBrands() {
+		return maxBrands;
+	}
+
+	public void setMaxBrands(Integer maxBrands) {
+		this.maxBrands = maxBrands;
+	}
+
+	public Boolean getActive() {
+		return active;
+	}
+
+	public void setActive(Boolean active) {
+		this.active = active;
+	}
+
+	public String getStripeCustomerId() {
+		return stripeCustomerId;
+	}
+
+	
+	
+	public LocalDateTime getUpdatedAt() {
+		return updatedAt;
+	}
+
+	public void setUpdatedAt(LocalDateTime updatedAt) {
+		this.updatedAt = updatedAt;
+	}
+
+	public void setStripeCustomerId(String stripeCustomerId) {
+		this.stripeCustomerId = stripeCustomerId;
+	}
+
+	 public void updateMaxBrandsBasedOnPlan() {
+	        switch (this.plan) {
+	            case "FREE":
+	                this.maxBrands = 3;
+	                break;
+	            case "STARTER":
+	                this.maxBrands = 10;
+	                break;
+	            case "PRO":
+	                this.maxBrands = 50;
+	                break;
+	            case "ENTERPRISE":
+	                this.maxBrands = 1000; // Quasi illimitato
+	                break;
+	            default:
+	                this.maxBrands = 3;
+	        }
+	    }
 }

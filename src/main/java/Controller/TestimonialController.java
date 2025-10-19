@@ -1,6 +1,7 @@
 package Controller;
 
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.Optional;
 
 import org.springframework.http.ResponseEntity;
@@ -51,9 +52,9 @@ public class TestimonialController {
         if (uOpt.isEmpty()) return ResponseEntity.status(401).build();
 
         User user = uOpt.get();
-        // verifica crediti
-        if (user.getCredits() == null || user.getCredits() <= 0) {
-            return ResponseEntity.status(402).build(); // payment required
+        // ✅ VERIFICA CREDITI AGGIORNATA
+        if (!userService.useCredit(user, req.getSelectedPostType())) {
+            return ResponseEntity.status(402).body(createNoCreditsResponse());
         }
         
         if (req.getPlatform() == null || req.getPlatform().isBlank())
@@ -101,9 +102,16 @@ public class TestimonialController {
 
         Testimonial saved = testimonialService.save(t);
 
-        // decrementa crediti
-        userService.decrementCredits(user);
 
         return ResponseEntity.ok(DtoMapper.toDTO(saved));
+    }
+    
+    private TestimonialDTO createNoCreditsResponse() {
+        TestimonialDTO dto = new TestimonialDTO();
+        dto.setSocialPostVersions(Arrays.asList("Crediti insufficienti. Acquista altri crediti per continuare a generare contenuti."));
+        dto.setHeadlineVersions(Arrays.asList("Crediti Esauriti"));
+        dto.setShortQuoteVersions(Arrays.asList("Aggiorna il tuo piano"));
+        dto.setCallToActionVersions(Arrays.asList("Visita la pagina dei piani per acquistare crediti"));
+        return dto;
     }
 }
