@@ -26,4 +26,9 @@ public class CreditPackageService {
     public Optional<CreditPackage> findByCode(String code) {
         return creditPackageRepository.findByCodeAndActiveTrue(code);
     }
+    
+    // ✅ AGGIUNGI QUESTO METODO MANCANTE!
+    public CreditPackage save(CreditPackage creditPackage) {
+        return creditPackageRepository.save(creditPackage);
+    }
 }

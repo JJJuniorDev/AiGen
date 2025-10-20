@@ -40,16 +40,27 @@ public class CreditPackage {
     @Column(nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
+  
     // Costruttori
     public CreditPackage() {}
 
-    public CreditPackage(String name, String code, Integer credits, BigDecimal price, String description) {
-        this.name = name;
-        this.code = code;
-        this.credits = credits;
-        this.price = price;
-        this.description = description;
-    }
+   
+
+	public CreditPackage(Long id, String name, String code, Integer credits, BigDecimal price, Boolean active,
+			String description, Integer validityDays, LocalDateTime createdAt) {
+		super();
+		this.id = id;
+		this.name = name;
+		this.code = code;
+		this.credits = credits;
+		this.price = price;
+		this.active = active;
+		this.description = description;
+		this.validityDays = validityDays;
+		this.createdAt = createdAt;
+		}
+
+
 
 	public Long getId() {
 		return id;
@@ -123,6 +134,6 @@ public class CreditPackage {
 		this.createdAt = createdAt;
 	}
 
-    // Getters e Setters...
+
     
 }

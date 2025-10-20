@@ -19,7 +19,7 @@ public class CreditPackageController {
     @Autowired
     private CreditPackageService creditPackageService;
     
-    @GetMapping
+    @GetMapping("/active")
     public ResponseEntity<List<CreditPackage>> getActivePackages() {
         return ResponseEntity.ok(creditPackageService.getActivePackages());
     }

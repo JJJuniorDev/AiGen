@@ -1,14 +1,9 @@
 package Service;
 
-
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
@@ -37,102 +32,225 @@ public class LLMService {
     
     public TestimonialDTO generate(String inputText, String platform, String postType,
             int emotion, int creativity, int formality, int urgency, int length, BrandProfile brandProfile) {
+        
         RestTemplate restTemplate = new RestTemplate();
 
-        // ✅ MIGLIORATO: Istruzioni specifiche per piattaforma
-        String platformInstructions = getPlatformSpecificInstructions(platform, postType);
+        // 🎯 1. GENERAZIONE PRIMARIA dei post
+        String initialContent = generateInitialPosts(inputText, platform, postType, 
+            emotion, creativity, formality, urgency, length, brandProfile, restTemplate);
         
-        // ✅ MIGLIORATO: Brand context più dettagliato
-        String brandContext = buildBrandContext(brandProfile);
+        // 🔄 2. AUTO-CORREZIONE: Groq ricontrolla e migliora i propri post
+        String correctedContent = autoCorrectPosts(initialContent, inputText, brandProfile, platform, restTemplate);
         
-        // ✅ NUOVO: Definizione chiara delle tipologie di contenuto
-        String contentTypesDefinition = getContentTypesDefinition();
+        // 🎨 3. PROCESSING FINALE
+        TestimonialDTO finalDTO = processFinalContent(correctedContent, inputText);
         
-        // ✅ MIGLIORATO: Prompt completo e strutturato
+        System.out.println("✅ Generazione post completata con auto-correzione!");
+        return finalDTO;
+    }
+
+ // 🎯 1. GENERAZIONE PRIMARIA - Crea post diversi tra loro
+    private String generateInitialPosts(String inputText, String platform, String postType,
+            int emotion, int creativity, int formality, int urgency, int length, 
+            BrandProfile brandProfile, RestTemplate restTemplate) {
+        
         String prompt = """
             %s
-                        
-            %s
-                        
-            %s
-                        
-            🎯 TRASFORMAZIONE CREATIVA:
-            TESTIMONIANZA ORIGINALE: "%s"
-                        
-            OBIETTIVO: Trasforma questa testimonianza in contenuto MARKETING autentico che:
-            • Racconti una STORIA con inizio/sviluppo/conclusione
-            • Mostri il VALORE concreto del prodotto/servizio  
-            • Includa ELEMENTI SPECIFICI della testimonianza originale
-            • Sia SCRITTO IN PRIMA PERSONA dal brand
-            • Crei CONNESSIONE EMOTIVA con il pubblico
-            • Guidi verso una CALL-TO-ACTION chiara
-                        
-            📊 PARAMETRI CREATIVI APPLICATI:
-            • Emozione: %d/100 → %s
-            • Creatività: %d/100 → %s
-            • Formalità: %d/100 → %s  
-            • Urgenza: %d/100 → %s
-            • Lunghezza: %d/100 → %s
-                        
-            🎪 FORMATO RISPOSTA OBBLIGATORIO (SOLO JSON):
+                    
+            🎯 MISSIONE: Genera 3 POST SOCIAL DIVERSI tra loro per %s
+                    
+            💡 INPUT BASE DI PARTENZA:
+            "%s"
+                    
+            🎪 OBIETTIVI CREATIVI:
+            • Crea 3 POST COMPLETAMENTE DIVERSI nell'approccio e nell'angolazione
+            • Ogni post deve avere una PERSONALITÀ e FOCUS unici
+            • Usa STRUTTURE DIVERSE per ogni versione
+            • Mantieni COERENZA con il brand ma ESPLORA angolazioni differenti
+                    
+            🎛️ PARAMETRI CREATIVI:
+            • Emozione: %d/100 - %s
+            • Creatività: %d/100 - %s
+            • Formalità: %d/100 - %s
+            • Piattaforma: %s - %s
+                    
+            📊 FORMATO RISPOSTA OBBLIGATORIO (SOLO JSON - STRUTTURA SEMPLICE):
             {
               "socialPostVersions": [
-                "Testo completo versione 1 con struttura narrativa e hashtag",
-                "Testo completo versione 2 con focus diverso e emoji appropriate",
-                "Testo completo versione 3 con angolazione unica e call-to-action"
+                "Testo completo del post 1 con approccio narrativo...",
+                "Testo completo del post 2 con focus su risultati...", 
+                "Testo completo del post 3 con angolazione emozionale..."
               ],
               "headlineVersions": [
-                "Titolo accattivante max 8-10 parole versione 1",
-                "Titolo benefit-driven max 8-10 parole versione 2", 
-                "Titolo curiosity-gap max 8-10 parole versione 3"
+                "Titolo breve e accattivante 1",
+                "Titolo breve e accattivante 2", 
+                "Titolo breve e accattivante 3"
               ],
               "shortQuoteVersions": [
-                "Citazione potente ed estrapolabile max 15 parole versione 1",
-                "Insight specifico del settore max 15 parole versione 2",
-                "Dichiarazione memorabile max 15 parole versione 3"
+                "Citazione breve e potente 1",
+                "Citazione breve e potente 2",
+                "Citazione breve e potente 3"
               ],
               "callToActionVersions": [
-                "CTA specifica e persuasiva versione 1",
-                "CTA alternativa e coinvolgente versione 2",
-                "CTA urgente e motivante versione 3"
+                "CTA diretta e persuasiva 1",
+                "CTA coinvolgente 2",
+                "CTA urgente 3"
               ]
             }
-                        
-            ⚠️ REGOLE STRETTE:
-            • NESSUN testo generico o vago
-            • NESSUN motto pubblicitario banale
-            • SEMPRE contenuto specifico e contestualizzato
-            • SEMPRE in prima persona dal punto di vista del brand
-            • MASSIMA coerenza con l'identità del brand fornita
+                    
+            ⚡ REGOLE DIVERSITÀ:
+            • VERSIONE 1: Approccio NARRATIVO - racconta una storia
+            • VERSIONE 2: Approccio VALUE-DRIVEN - focus su benefici concreti  
+            • VERSIONE 3: Approccio EMOTIVO - enfasi su sentimenti e trasformazione
+            
+            ❗❗❗ IMPORTANTE: 
+            • Usa SEMPLICI ARRAY DI STRINGHE, non oggetti annidati
+            • Ogni elemento deve essere una SINGOLA STRINGA
+            • NESSUNA struttura complessa con "titolo", "testo", "immagine"
+            • SOLO testo semplice negli array
+                    
+            🚫 STRUTTURA VIETATA:
+            "socialPostVersions": [
+              {
+                "titolo": "...",   ← ERRATO!
+                "testo": "...",    ← ERRATO!
+                "immagine": "..."  ← ERRATO!
+              }
+            ]
+                    
+            ✅ STRUTTURA CORRETTA:
+            "socialPostVersions": [
+              "Testo completo del post qui...",  ← CORRETTO!
+              "Altro testo completo qui...",     ← CORRETTO!
+              "Terzo testo completo qui..."      ← CORRETTO!
+            ]
             """.formatted(
-                brandContext,
-                platformInstructions, 
-                contentTypesDefinition,
+                buildBrandContext(brandProfile),
+                platform,
                 inputText,
                 emotion, getEmotionDescription(emotion),
                 creativity, getCreativityDescription(creativity),
                 formality, getFormalityDescription(formality),
-                urgency, getUrgencyDescription(urgency),
-                length, getLengthDescription(length)
+                platform, getPlatformSpecificInstructions(platform, postType)
             );
         
-        System.out.println("🎯 Prompt inviato a Groq:");
-        System.out.println(prompt);
-        System.out.println("======================");
+        return callGroqAPI(prompt, restTemplate, "Generazione post iniziali");
+    }
+
+ // ✅ 2. AUTO-CORREZIONE: Groq corregge e migliora i propri post
+    private String autoCorrectPosts(String initialContent, String originalInput, 
+            BrandProfile brandProfile, String platform, RestTemplate restTemplate) {
+        
+        String correctionPrompt = """
+            🔍 SISTEMA DI AUTO-CORREZIONE: Analizza e MIGLIORA questi post social generati.
+            
+            💡 INPUT ORIGINALE:
+            "%s"
+            
+            📦 POST GENERATI DA CORREGGERE:
+            %s
+            
+            🎯 CONTESTO:
+            %s
+            
+            🔧 OBIETTIVI CORREZIONE:
+            1. ✅ CORREGGI automaticamente errori grammaticali, ortografici, di sintassi
+            2. ✅ MIGLIORA fluidità e naturalezza del linguaggio
+            3. ✅ RAFFORZA diversità tra i post - devono essere ancora più diversi tra loro
+            4. ✅ OTTIMIZZA per %s
+            5. ✅ MANTIENI l'approccio narrativo dove presente ma rendilo più coinvolgente
+            
+            🎪 MIGLIORAMENTI RICHIESTI:
+            • Assicura che i 3 post abbiano ANGOLAZIONI veramente diverse
+            • Migliora le CALL-TO-ACTION per essere più persuasive
+            • Rafforza la COERENZA con il brand
+            • Correggi eventuali inconsistenze nel tono
+            
+            📊 FORMATO RISPOSTA OBBLIGATORIO (SOLO JSON - STRUTTURA SEMPLICE):
+            {
+              "correctedContent": {
+                "socialPostVersions": ["Post corretto 1...", "Post corretto 2...", "Post corretto 3..."],
+                "headlineVersions": ["Headline corretta 1...", "Headline corretta 2...", "Headline corretta 3..."],
+                "shortQuoteVersions": ["Quote corretta 1...", "Quote corretta 2...", "Quote corretta 3..."],
+                "callToActionVersions": ["CTA corretta 1...", "CTA corretta 2...", "CTA corretta 3..."]
+              },
+              "correctionsSummary": {
+                "totalCorrections": 5,
+                "mainImprovements": ["grammatica", "diversità", "persuasione"],
+                "qualityScore": 92
+              }
+            }
+            
+            ⚠️ IMPORTANTE: 
+            • Lascia che sia l'AI a correggere tutto - non fare correzioni manuali
+            • USA SEMPRE ARRAY DI STRINGHE SEMPLICI, non oggetti annidati
+            • Ogni elemento negli array deve essere una SINGOLA STRINGA
+            """.formatted(
+                originalInput,
+                initialContent,
+                buildBrandContext(brandProfile),
+                platform
+            );
+        
+        return callGroqAPI(correctionPrompt, restTemplate, "Auto-correzione post");
+    }
+    
+    // 🎨 3. PROCESSING FINALE
+    private TestimonialDTO processFinalContent(String correctedContent, String inputText) {
+        try {
+            String cleanContent = correctedContent
+                .replaceAll("(?i)```json", "")
+                .replaceAll("```", "")
+                .trim();
+                
+            JsonNode root = mapper.readTree(cleanContent);
+            
+            // Estrae il contenuto corretto (che potrebbe essere nested in correctedContent)
+            JsonNode contentNode = root;
+            if (root.has("correctedContent")) {
+                contentNode = root.get("correctedContent");
+            }
+            
+            TestimonialDTO dto = new TestimonialDTO();
+            dto.setInputText(inputText);
+            dto.setSocialPostVersions(extractList(contentNode, "socialPostVersions"));
+            dto.setHeadlineVersions(extractList(contentNode, "headlineVersions"));
+            dto.setShortQuoteVersions(extractList(contentNode, "shortQuoteVersions"));
+            dto.setCallToActionVersions(extractList(contentNode, "callToActionVersions"));
+            
+            // Log del miglioramento
+            if (root.has("correctionsSummary")) {
+                JsonNode summary = root.get("correctionsSummary");
+                System.out.println("📈 Correzioni applicate: " + 
+                    summary.get("totalCorrections").asInt() + " - Qualità: " + 
+                    summary.get("qualityScore").asInt() + "/100");
+            }
+            
+            return dto;
+            
+        } catch (Exception e) {
+            System.err.println("❌ Errore processing finale: " + e.getMessage());
+            return createFallbackDTO(inputText);
+        }
+    }
+
+    // 🔧 METODO UNIFICATO per chiamate API
+    private String callGroqAPI(String prompt, RestTemplate restTemplate, String phase) {
+        System.out.println("🔄 " + phase + ": Invio richiesta a Groq...");
         
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.setBearerAuth(groqApiKey);
 
         Map<String, Object> body = Map.of(
-                "model", "llama-3.1-8b-instant",
-                "messages", new Object[]{
-                        Map.of("role", "system", "content", buildSystemPrompt()),
-                        Map.of("role", "user", "content", prompt)
-                },
-                "temperature", calculateTemperature(creativity),
-                "max_tokens", 1200, // ✅ Aumentato per contenuti più lunghi
-                "response_format", Map.of("type", "json_object")
+            "model", "llama-3.1-8b-instant",
+            "messages", new Object[]{
+                Map.of("role", "system", "content", buildSystemPrompt()),
+                Map.of("role", "user", "content", prompt)
+            },
+            "temperature", 0.8, // ✅ Più alto per più creatività e diversità
+            "max_tokens", 2000,
+            "response_format", Map.of("type", "json_object")
         );
 
         try {
@@ -140,49 +258,65 @@ public class LLMService {
             ResponseEntity<Map> response = restTemplate.exchange(GROQ_URL, HttpMethod.POST, request, Map.class);
             
             if (response.getBody() == null || !response.getBody().containsKey("choices")) {
-                throw new RuntimeException("Risposta API vuota o malformata");
+                throw new RuntimeException("Risposta API vuota");
             }
             
             String content = (String) ((Map) ((Map) ((List<?>) response.getBody().get("choices")).get(0)).get("message")).get("content");
+            System.out.println("✅ " + phase + ": Risposta ricevuta");
             
-            // ✅ PULIZIA DELLA RISPOSTA
-            content = cleanJsonResponse(content);
-            System.out.println("📦 Risposta pulita: " + content);
-            
-            // ✅ PARSING E COSTRUZIONE DTO
-            TestimonialDTO dto = parseResponseToDTO(content, inputText);
-            System.out.println("✅ Contenuti generati con successo!");
-            
-            return dto;
+            return content;
             
         } catch (Exception e) {
-            System.err.println("❌ Errore nella chiamata API: " + e.getMessage());
-            return createFallbackDTO(inputText);
+            System.err.println("❌ Errore in " + phase + ": " + e.getMessage());
+            throw new RuntimeException("Fallita fase: " + phase);
         }
     }
-    
-    // ✅ NUOVO: System prompt più dettagliato
+
+    // 🧠 SYSTEM PROMPT OTTIMIZZATO
     private String buildSystemPrompt() {
         return """
-            Sei un COPYWRITER ESPERTO di social media marketing e content strategy.
-            SPECIALIZZAZIONE: Trasformare testimonianze clienti in contenuti marketing autentici e coinvolgenti.
+            Sei un ESPERTO CREATIVO di SOCIAL MEDIA specializzato in:
+            • Generazione di POST SOCIAL DIVERSIFICATI e ORIGINALI
+            • Auto-correzione e miglioramento qualità del contenuto
+            • Adattamento multi-piattaforma e multi-format
             
             COMPETENZE CHIAVE:
-            • Storytelling persuasivo e strutturato
-            • Adattamento del tono di voce al brand
-            • Creazione di call-to-action efficaci
-            • Ottimizzazione per diverse piattaforme social
-            • Estrazione di insights value-driven dalle testimonianze
+            🎭 DIVERSITÀ CREATIVA: Crea contenuti con angolazioni e approcci diversi
+            🔍 AUTO-ANALISI: Identifica e correggi errori nei contenuti generati
+            📈 OTTIMIZZAZIONE: Migliora costantemente qualità e impatto
+            🎯 PIATTAFORMA: Adatta contenuti specificamente per ogni social network
             
-            OBIETTIVO PRIMARIO: Creare contenuti ORIGINALI che:
-            - Raccontino una storia autentica
-            - Mostrino valore concreto
-            - Coinvolgano emotivamente
-            - Guidino all'azione
-            - Siano perfettamente allineati al brand
+            PROCESSO CREATIVO:
+            1. GENERA 3 versiones DIVERSE dello stesso concetto
+            2. ASSICURA DIVERSITÀ reale nell'approccio e nel tono
+            3. AUTO-CORREGGI errori e migliora la qualità
+            4. OTTIMIZZA per la piattaforma specifica
+            
+            FORMATO: Restituisci SEMPRE JSON valido senza markdown.
             """;
     }
-    
+
+    // 🏗️ CONTESTO BRAND
+    private String buildBrandContext(BrandProfile brand) {
+        if (brand == null) return "Brand: Generico - Tono: Professionale - Target: Clienti potenziali";
+        
+        return String.format("""
+            🏢 BRAND: %s
+            🎭 TONO DI VOCE: %s
+            👥 TARGET: %s
+            💫 VALORI: %s
+            🔑 PAROLE CHIAVE: %s
+            ❌ DA EVITARE: %s
+            """,
+            brand.getBrandName(),
+            brand.getTone().toString(),
+            brand.getTargetAudience(),
+            brand.getBrandValues(),
+            String.join(", ", brand.getPreferredKeywords()),
+            String.join(", ", brand.getAvoidedWords())
+        );
+    }
+
     // ✅ MIGLIORATO: Istruzioni specifiche per piattaforma
     private String getPlatformSpecificInstructions(String platform, String postType) {
         String baseInstructions = switch (platform.toLowerCase()) {
@@ -265,156 +399,7 @@ public class LLMService {
                 """.formatted(postType);
         };
     }
-    
-    // ✅ MIGLIORATO: Brand context più ricco e strategico
-    private String buildBrandContext(BrandProfile brand) {
-        if (brand == null) {
-            return """
-                🏢 CONTESTO BRAND: Nessun profilo brand specificato.
-                • Usa un tono generico professionale e autentico
-                • Focus su value chiaro e storytelling coinvolgente
-                """;
-        }
-        
-        return String.format("""
-            🏢 IDENTITÀ BRAND COMPLETA:
-            NOME BRAND: %s
-            TONO DI VOCE: %s (%s)
-            VALORI FONDANTI: %s
-            TARGET AUDIENCE: %s
-            POSIZIONAMENTO: %s
-            
-            📝 LINEE GUIDA CONTENUTI:
-            • PAROLE CHIAVE PREFERITE: %s
-            • PAROLE DA EVITARE ASSOLUTAMENTE: %s
-            • TAGLINE ISPIRAZIONALE: "%s"
-            • HASHTAG BRAND: %s
-            • CALL-TO-ACTION TIPICHE: %s
-            
-            🎬 STILE E COERENZA RICHIESTO:
-            • SCRIVI IN PRIMA PERSONA COME SE FOSSI IL BRAND
-            • MANTIENI ASSOLUTA COERENZA CON IL TONO %s
-            • INCORPORA ALMENO 2-3 PAROLE CHIAVE PREFERITE
-            • EVITA ASSOLUTAMENTE: %s
-            • PARLA DIRETTAMENTE A: %s
-            • TRASMETTI I VALORI: %s
-            """,
-            brand.getBrandName(),
-            brand.getTone().toString(),
-            getToneDescription(brand.getTone()),
-            brand.getBrandValues(),
-            brand.getTargetAudience(),
-            brand.getPositioning() != null ? brand.getPositioning() : "Non specificato",
-            String.join(", ", brand.getPreferredKeywords()),
-            String.join(", ", brand.getAvoidedWords()),
-            brand.getTagline(),
-            String.join(" ", brand.getDefaultHashtags()),
-            getBrandCTAs(brand),
-            brand.getTone().toString(),
-            String.join(", ", brand.getAvoidedWords()),
-            brand.getTargetAudience(),
-            brand.getBrandValues()
-        );
-    }
-    
-    // ✅ NUOVO: Definizione chiara delle tipologie di contenuto
-    private String getContentTypesDefinition() {
-        return """
-            🎪 DEFINIZIONE TIPOLOGIE CONTENUTO:
-            
-            📱 SOCIAL POSTS (testo principale completo):
-            • VERSIONE 1: Storytelling emozionale - focus sulla trasformazione
-            • VERSIONE 2: Approccio value-driven - dati e risultati concreti  
-            • VERSIONE 3: Angolazione unique - insight controintuitivo o sorprendente
-            
-            📰 HEADLINES (titoli accattivanti 8-10 parole):
-            • VERSIONE 1: Curiosity-gap - crea desiderio di scoprire di più
-            • VERSIONE 2: Benefit-driven - highlight del valore principale
-            • VERSIONE 3: How-to/educativo - posiziona come soluzione
-            
-            💬 SHORT QUOTES (citazioni estrapolabili max 15 parole):
-            • VERSIONE 1: Citazione ispirazionale - focus su mindset
-            • VERSIONE 2: Insight settoriale - dimostra expertise
-            • VERSIONE 3: Dichiarazione memorabile - facile da ricordare e condividere
-            
-            🎯 CALL-TO-ACTION (inviti all'azione specifici):
-            • VERSIONE 1: CTA diretta e persuasiva
-            • VERSIONE 2: CTA coinvolgente e community-oriented
-            • VERSIONE 3: CTA urgente e motivante
-            """;
-    }
-    
-    // ✅ NUOVO: Helper methods per descrizioni parametriche
-    private String getLengthDescription(int length) {
-        if (length <= 20) return "MOLTO BREVE (max 100 caratteri) - Essenziale e impattante";
-        if (length <= 40) return "BREVE (100-250 caratteri) - Conciso ma completo";
-        if (length <= 60) return "MEDIO (250-500 caratteri) - Bilanciato e narrativo";
-        if (length <= 80) return "LUNGO (500-800 caratteri) - Dettagliato e approfondito";
-        return "MOLTO LUNGO (800+ caratteri) - Estremamente dettagliato";
-    }
-    
-    private String getEmotionDescription(int emotion) {
-        if (emotion <= 20) return "Tono neutro e razionale - Focus su logica e dati";
-        if (emotion <= 40) return "Tono leggero e positivo - Approccio costruttivo";
-        if (emotion <= 60) return "Tono empatico e coinvolgente - Bilanciato emozione/ragione";
-        if (emotion <= 80) return "Tono emozionale e passionale - Forte coinvolgimento";
-        return "Tono altamente emozionale - Massima carica emotiva";
-    }
-    
-    private String getCreativityDescription(int creativity) {
-        if (creativity <= 20) return "Approccio diretto e fattuale - Minimal creativity";
-        if (creativity <= 40) return "Leggermente creativo - Small creative flourishes";
-        if (creativity <= 60) return "Moderatamente creativo - Good balance creativity/clarity";
-        if (creativity <= 80) return "Molto creativo - Strong creative elements";
-        return "Estremamente creativo - Maximum innovation and originality";
-    }
-    
-    private String getFormalityDescription(int formality) {
-        if (formality <= 20) return "Tono informale e colloquiale - Linguaggio everyday";
-        if (formality <= 40) return "Tono semi-informale - Conversazionale ma professionale";
-        if (formality <= 60) return "Tono bilanciato - Professionale ma accessibile";
-        if (formality <= 80) return "Tono formale - Linguaggio professionale strutturato";
-        return "Tono molto formale - Linguaggio elevato e istituzionale";
-    }
-    
-    private String getUrgencyDescription(int urgency) {
-        if (urgency <= 20) return "Nessuna urgenza - Approccio contemplativo";
-        if (urgency <= 40) return "Leggera urgenza - Gentle prompting";
-        if (urgency <= 60) return "Urgenza moderata - Clear call-to-action";
-        if (urgency <= 80) return "Alta urgenza - Strong prompting";
-        return "Urgenza massima - Immediate action required";
-    }
-    
-    // ✅ NUOVO: Descrizione estesa del tono
-    private String getToneDescription(Object tone) {
-        if (tone == null) return "Non specificato";
-        
-        return switch (tone.toString().toLowerCase()) {
-            case "professional" -> "Autorevole ma accessibile, competente ma umano";
-            case "friendly" -> "Caldo, accogliente, come un consiglio tra amici";
-            case "authoritative" -> "Esperto, confidente, posizionamento leader";
-            case "casual" -> "Informale, rilassato, linguaggio everyday";
-            case "enthusiastic" -> "Energetico, positivo, carico di passione";
-            case "empathetic" -> "Comprendente, supportivo, focalizzato sui bisogni";
-            case "inspirational" -> "Motivante, elevante, focus su possibilità";
-            case "humorous" -> "Leggero, spiritoso, approccio giocoso quando appropriato";
-            default -> "Professionale e autentico";
-        };
-    }
-    
-    // ✅ NUOVO: Call-to-action tipiche del brand
-    private String getBrandCTAs(BrandProfile brand) {
-        if (brand.getPreferredCTAs() != null && !brand.getPreferredCTAs().isEmpty()) {
-            return String.join(", ", brand.getPreferredCTAs());
-        }
-        return "Scopri di più, Inizia oggi, Unisciti a noi, Contattaci";
-    }
-    
-    // ✅ NUOVO: Temperature dinamica basata sulla creatività
-    private double calculateTemperature(int creativity) {
-        return 0.7 + (creativity / 100.0 * 0.3); // Range: 0.7 - 1.0
-    }
-    
+
     // ✅ MIGLIORATO: Pulizia JSON più robusta
     private String cleanJsonResponse(String content) {
         if (content == null) return "{}";
@@ -435,26 +420,6 @@ public class LLMService {
         content = content.replaceAll("(\"[^\"]*\")?\\s*:\\s*'([^']*)'", "$1: \"$2\""); // single quotes to double
         
         return content;
-    }
-    
-    // ✅ NUOVO: Parsing completo del response
-    private TestimonialDTO parseResponseToDTO(String content, String inputText) {
-        try {
-            JsonNode root = mapper.readTree(content);
-            
-            TestimonialDTO dto = new TestimonialDTO();
-            dto.setInputText(inputText);
-            dto.setSocialPostVersions(extractList(root, "socialPostVersions"));
-            dto.setHeadlineVersions(extractList(root, "headlineVersions"));
-            dto.setShortQuoteVersions(extractList(root, "shortQuoteVersions"));
-            dto.setCallToActionVersions(extractList(root, "callToActionVersions"));
-            
-            return dto;
-            
-        } catch (Exception e) {
-            System.err.println("❌ Errore parsing JSON: " + e.getMessage());
-            return createFallbackDTO(inputText);
-        }
     }
     
     // ✅ MIGLIORATO: Extract list con ObjectMapper
@@ -489,9 +454,9 @@ public class LLMService {
     // ✅ NUOVO: Testi di fallback contestuali
     private String getFallbackText(String key) {
         return switch (key) {
-            case "socialPostVersions" -> "Contenuto social ottimizzato basato sulla testimonianza";
+            case "socialPostVersions" -> "Contenuto social ottimizzato";
             case "headlineVersions" -> "Titolo accattivante per massimizzare engagement";
-            case "shortQuoteVersions" -> "Citazione potente estrapolabile dalla testimonianza";
+            case "shortQuoteVersions" -> "Citazione potente estrapolabile";
             case "callToActionVersions" -> "Invito all'azione efficace e persuasivo";
             default -> "Contenuto generato automaticamente";
         };
@@ -502,13 +467,13 @@ public class LLMService {
         TestimonialDTO dto = new TestimonialDTO();
         dto.setInputText(inputText);
         dto.setSocialPostVersions(Arrays.asList(
-            "Stiamo elaborando contenuti ottimali per la tua testimonianza...",
-            "Generazione di social post coinvolgenti in corso...",
+            "Stiamo elaborando contenuti ottimali...",
+            "Generazione di social post coinvolgenti...",
             "Preparazione contenuti social personalizzati..."
         ));
         dto.setHeadlineVersions(Arrays.asList(
             "Scopri come abbiamo trasformato questa esperienza",
-            "Risultati straordinari dalla testimonianza del cliente", 
+            "Risultati straordinari dal nostro lavoro", 
             "Storytelling autentico che ispira azione"
         ));
         dto.setShortQuoteVersions(Arrays.asList(
@@ -523,6 +488,70 @@ public class LLMService {
         ));
         return dto;
     }
+
+    // 🎪 DESCRIZIONI PARAMETRICHE
+    private String getEmotionDescription(int emotion) {
+        if (emotion <= 20) return "Neutro e razionale";
+        if (emotion <= 40) return "Leggermente positivo"; 
+        if (emotion <= 60) return "Empatico e coinvolgente";
+        if (emotion <= 80) return "Emozionale e passionale";
+        return "Altamente emozionale";
+    }
+
+    private String getCreativityDescription(int creativity) {
+        if (creativity <= 20) return "Diretto e fattuale";
+        if (creativity <= 40) return "Leggermente creativo";
+        if (creativity <= 60) return "Moderatamente creativo";
+        if (creativity <= 80) return "Molto creativo";
+        return "Estremamente creativo";
+    }
+
+    private String getFormalityDescription(int formality) {
+        if (formality <= 20) return "Informale e colloquiale";
+        if (formality <= 40) return "Semi-informale";
+        if (formality <= 60) return "Bilanciato";
+        if (formality <= 80) return "Formale";
+        return "Molto formale";
+    }
     
-    // ✅ RIMOSSO: Metodi deprecated (extract e extractListManual non più necessari)
+    private String getUrgencyDescription(int urgency) {
+        if (urgency <= 20) return "Nessuna urgenza - Approccio contemplativo";
+        if (urgency <= 40) return "Leggera urgenza - Gentle prompting";
+        if (urgency <= 60) return "Urgenza moderata - Clear call-to-action";
+        if (urgency <= 80) return "Alta urgenza - Strong prompting";
+        return "Urgenza massima - Immediate action required";
+    }
+    
+    private String getLengthDescription(int length) {
+        if (length <= 20) return "MOLTO BREVE (max 100 caratteri) - Essenziale e impattante";
+        if (length <= 40) return "BREVE (100-250 caratteri) - Conciso ma completo";
+        if (length <= 60) return "MEDIO (250-500 caratteri) - Bilanciato e narrativo";
+        if (length <= 80) return "LUNGO (500-800 caratteri) - Dettagliato e approfondito";
+        return "MOLTO LUNGO (800+ caratteri) - Estremamente dettagliato";
+    }
+    
+    // ✅ NUOVO: Descrizione estesa del tono
+    private String getToneDescription(Object tone) {
+        if (tone == null) return "Non specificato";
+        
+        return switch (tone.toString().toLowerCase()) {
+            case "professional" -> "Autorevole ma accessibile, competente ma umano";
+            case "friendly" -> "Caldo, accogliente, come un consiglio tra amici";
+            case "authoritative" -> "Esperto, confidente, posizionamento leader";
+            case "casual" -> "Informale, rilassato, linguaggio everyday";
+            case "enthusiastic" -> "Energetico, positivo, carico di passione";
+            case "empathetic" -> "Comprendente, supportivo, focalizzato sui bisogni";
+            case "inspirational" -> "Motivante, elevante, focus su possibilità";
+            case "humorous" -> "Leggero, spiritoso, approccio giocoso quando appropriato";
+            default -> "Professionale e autentico";
+        };
+    }
+    
+    // ✅ NUOVO: Call-to-action tipiche del brand
+    private String getBrandCTAs(BrandProfile brand) {
+        if (brand.getPreferredCTAs() != null && !brand.getPreferredCTAs().isEmpty()) {
+            return String.join(", ", brand.getPreferredCTAs());
+        }
+        return "Scopri di più, Inizia oggi, Unisciti a noi, Contattaci";
+    }
 }

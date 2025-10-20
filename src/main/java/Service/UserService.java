@@ -81,9 +81,7 @@ this.passwordEncoder = passwordEncoder;
             user.setCredits(0);
         }
         
-        int oldBalance = user.getCredits();
-        user.setCredits(user.getCredits() + credits);
-        user.setUpdatedAt(LocalDateTime.now());
+        user.setCredits(user.getCredits()+ credits);
         userRepository.save(user);
         
         createTransaction(user, "PURCHASE", credits, user.getCredits(), 
