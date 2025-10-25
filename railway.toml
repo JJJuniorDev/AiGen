@@ -1,0 +1,13 @@
+cat > railway.toml << 'EOF'
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "./Dockerfile"
+
+[deploy]
+healthcheckPath = "/api/health"
+healthcheckTimeout = 100
+restartPolicyType = "ON_FAILURE"
+
+[env]
+JAVA_TOOL_OPTIONS = "-Xmx512m"
+EOF
