@@ -21,6 +21,7 @@ import jakarta.annotation.PostConstruct;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
 
 import model.CreditPackage;
 import model.User;
@@ -87,37 +88,54 @@ public class StripeService {
 
     public ResponseEntity<String> handleWebhook(String payload, String sigHeader) {
         System.out.println("🔄 WEBHOOK RECEIVED!");
-        System.out.println("📦 Payload length: " + payload.length());
-        System.out.println("🔐 Signature present: " + (sigHeader != null));
-        System.out.println("🔑 Webhook secret configured: " + (webhookSecret != null && !webhookSecret.isEmpty()));
         
         try {
-            System.out.println("🔍 Verifying signature...");
             Event event = Webhook.constructEvent(payload, sigHeader, webhookSecret);
             System.out.println("✅ Signature verified! Event type: " + event.getType());
             
-            if ("checkout.session.completed".equals(event.getType())) {
-                System.out.println("💰 Checkout session completed - processing payment...");
-                Session session = (Session) event.getDataObjectDeserializer().getObject().get();
-                System.out.println("🎫 Session ID: " + session.getId());
-                System.out.println("👤 User ID from metadata: " + session.getMetadata().get("user_id"));
-                System.out.println("📦 Package ID from metadata: " + session.getMetadata().get("package_id"));
-                
-                handleSuccessfulPayment(session);
-            } else {
-                System.out.println("ℹ️ Ignoring event type: " + event.getType());
+            if (!"checkout.session.completed".equals(event.getType())) {
+                System.out.println("ℹ️ Ignoring event: " + event.getType());
+                return ResponseEntity.ok("Event ignored");
             }
             
-            return ResponseEntity.ok("Webhook processed successfully");
+            System.out.println("💰 PAGAMENTO COMPLETATO RILEVATO!");
             
-        } catch (SignatureVerificationException e) {
-            System.err.println("❌ SIGNATURE VERIFICATION FAILED: " + e.getMessage());
-            System.err.println("🔑 Expected secret: " + webhookSecret);
-            return ResponseEntity.badRequest().body("Invalid signature");
+            // ✅ CORREZIONE: USA getObject() DIRETTAMENTE
+            Session session = (Session) event.getData().getObject();
+            
+            // 5. Log dettagliato
+            System.out.println("🔍 DETTAGLI SESSION:");
+            System.out.println("   🆔 ID: " + session.getId());
+            System.out.println("   📊 Status: " + session.getStatus());
+            System.out.println("   💳 Payment Status: " + session.getPaymentStatus());
+            System.out.println("   👤 User ID: " + session.getMetadata().get("user_id"));
+            System.out.println("   📦 Package ID: " + session.getMetadata().get("package_id"));
+            System.out.println("   📧 Email: " + session.getCustomerEmail());
+            
+            // 6. Verifica condizioni
+            boolean isComplete = "complete".equals(session.getStatus());
+            boolean isPaid = "paid".equals(session.getPaymentStatus());
+            boolean hasMetadata = session.getMetadata().get("user_id") != null && 
+                                 session.getMetadata().get("package_id") != null;
+            
+            System.out.println("🔍 CONDIZIONI:");
+            System.out.println("   ✅ Session complete: " + isComplete);
+            System.out.println("   ✅ Payment paid: " + isPaid);
+            System.out.println("   ✅ Metadata present: " + hasMetadata);
+            
+            if (isComplete && isPaid && hasMetadata) {
+                System.out.println("✅✅✅ TUTTE LE CONDIZIONI SODDISFATTE - AGGIUNGO CREDITI!");
+                handleSuccessfulPayment(session);
+            } else {
+                System.out.println("❌ Condizioni non soddisfatte - skipping");
+            }
+            
+            return ResponseEntity.ok("Webhook processed");
+            
         } catch (Exception e) {
-            System.err.println("❌ WEBHOOK PROCESSING ERROR: " + e.getMessage());
+            System.err.println("❌ ERRORE CRITICO: " + e.getMessage());
             e.printStackTrace();
-            return ResponseEntity.badRequest().body("Webhook error: " + e.getMessage());
+            return ResponseEntity.badRequest().body("Webhook error");
         }
     }
 

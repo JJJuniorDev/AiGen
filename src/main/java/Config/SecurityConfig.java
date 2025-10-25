@@ -44,8 +44,9 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .authorizeHttpRequests(auth -> auth
+            		.requestMatchers("/api/payments/webhook").permitAll()
                 .requestMatchers("/api/auth/**").permitAll()
-                .requestMatchers("/api/payments/webook").permitAll()
+                
                 .anyRequest().authenticated()
             )
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

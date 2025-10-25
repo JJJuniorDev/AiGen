@@ -62,7 +62,7 @@ public class PaymentController {
         }
     }
 
-    @PostMapping("/webook")
+    @PostMapping("/webhook")
     public ResponseEntity<String> handleStripeWebhook(
             @RequestBody String payload,
             @RequestHeader("Stripe-Signature") String sigHeader) {
