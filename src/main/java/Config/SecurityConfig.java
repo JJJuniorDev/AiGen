@@ -28,11 +28,15 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(List.of(
-        		 "http://localhost:*",              // Tutte le porte locali
-        	        "https://*.vercel.app",            // Tutti i domini Vercel
-        	        "https://*.up.railway.app" 
+                "http://localhost:*",
+                "http://localhost:3000",
+                "http://localhost:5173",
+                "https://*.vercel.app",
+                "https://*.up.railway.app",
+                "https://dynamic-wholeness.vercel.app" // aggiungi il dominio specifico
             ));
-        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(List.of("*"));
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Origin", "Accept"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
@@ -48,6 +52,7 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .authorizeHttpRequests(auth -> auth
+            	    .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
             		.requestMatchers("/api/payments/webhook").permitAll()
                 .requestMatchers("/api/auth/**").permitAll()
                 
