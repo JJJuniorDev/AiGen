@@ -51,8 +51,9 @@ public class SecurityConfig {
         http
             .csrf(csrf -> csrf.disable())
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            .securityMatcher(request -> !"OPTIONS".equalsIgnoreCase(request.getMethod()))
             .authorizeHttpRequests(auth -> auth
-            	    .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+            	//    .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
             		.requestMatchers("/api/payments/webhook").permitAll()
                 .requestMatchers("/api/auth/**").permitAll()
                 
