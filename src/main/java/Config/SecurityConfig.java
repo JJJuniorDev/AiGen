@@ -27,19 +27,10 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of(
-                "http://localhost:*",
-                "http://localhost:3000",
-                "http://localhost:5173",
-                "https://*.vercel.app",
-                "https://*.up.railway.app",
-                "https://dynamic-wholeness.vercel.app" // aggiungi il dominio specifico
-            ));
-        configuration.setAllowedHeaders(List.of("*"));
-        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
-        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Origin", "Accept"));
+        configuration.addAllowedOriginPattern("*");
+        configuration.addAllowedMethod("*");
+        configuration.addAllowedHeader("*");
         configuration.setAllowCredentials(true);
-        configuration.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
@@ -49,18 +40,13 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtFilter jwtFilter) throws Exception {
         http
-            .csrf(csrf -> csrf.disable())
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-            .securityMatcher(request -> !"OPTIONS".equalsIgnoreCase(request.getMethod()))
+            .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
-            	//    .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-            		.requestMatchers("/api/payments/webhook").permitAll()
-                .requestMatchers("/api/auth/**").permitAll()
-                
-                .anyRequest().authenticated()
+                .anyRequest().permitAll() // Temporaneamente permetti tutto per test
             )
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .addFilterBefore(jwtFilter, org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class);
+            .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
