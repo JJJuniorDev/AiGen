@@ -4,6 +4,14 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
@@ -18,6 +26,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import DTO.TestimonialDTO;
+import jakarta.annotation.PostConstruct;
 import model.BrandProfile;
 
 @Service
@@ -30,29 +39,98 @@ public class LLMService {
 
     private final ObjectMapper mapper = new ObjectMapper();
     
+    // ✅ GESTIONE CONCORRENZA E COSTI
+    private final AtomicInteger activeRequests = new AtomicInteger(0);
+    private static final int MAX_CONCURRENT_REQUESTS = 3; // Ridotto per sicurezza con 30K TPM
+    private final Queue<CompletableFuture<String>> requestQueue = new ConcurrentLinkedQueue<>();
+    
+    // ✅ MONITORAGGIO TOKEN
+    private final AtomicLong tokensThisMinute = new AtomicLong(0);
+    private final ScheduledExecutorService tokenMonitor = Executors.newScheduledThreadPool(1);
+    
+   /* @PostConstruct
+    public void init() {
+        // Reset contatore token ogni minuto
+        tokenMonitor.scheduleAtFixedRate(() -> {
+            long previous = tokensThisMinute.getAndSet(0);
+            if (previous > 0) {
+                System.out.println("🔄 Contatore token resettato. Precedente: " + previous + " token");
+            }
+        }, 1, 1, TimeUnit.MINUTES);
+    }
+    
     public TestimonialDTO generate(String inputText, String platform, String postType,
             int emotion, int creativity, int formality, int urgency, int length, BrandProfile brandProfile) {
         
+        // ✅ VERIFICA DISPONIBILITÀ PRIMA DI PROCEDERE
+        if (!canProcessRequest(7000)) {
+            throw new RuntimeException("Servizio temporaneamente occupato. Riprova tra qualche secondo.");
+        }
+        
         RestTemplate restTemplate = new RestTemplate();
 
-        // 🎯 1. GENERAZIONE PRIMARIA con contesto avanzato
-        String initialContent = generateInitialPosts(inputText, platform, postType, 
-            emotion, creativity, formality, urgency, length, brandProfile, restTemplate);
-        
-        // 🔍 2. ANALISI QUALITATIVA E RAFFINAMENTO
-        String refinedContent = qualityRefinementLayer(initialContent, inputText, brandProfile, platform, restTemplate);
-        
-        // 🎨 3. OTTIMIZZAZIONE FINALE E ADATTAMENTO
-        String optimizedContent = finalOptimizationLayer(refinedContent, brandProfile, platform, postType, restTemplate);
-        
-        // 📦 4. PROCESSING FINALE
-        TestimonialDTO finalDTO = processFinalContent(optimizedContent, inputText);
-        
-        System.out.println("✅ Generazione completata con sistema di raffinamento a 3 livelli!");
-        return finalDTO;
+        try {
+            // 🎯 MANTIENI IL TUO SISTEMA A 3 FASI PREMIUM
+            String initialContent = generateInitialPosts(inputText, platform, postType, 
+                emotion, creativity, formality, urgency, length, brandProfile, restTemplate);
+            
+            String refinedContent = qualityRefinementLayer(initialContent, inputText, brandProfile, platform, restTemplate);
+            
+            String optimizedContent = finalOptimizationLayer(refinedContent, brandProfile, platform, postType, restTemplate);
+            
+            // ✅ REGISTRA UTILIZZO TOKEN
+            recordTokenUsage(7000);
+            
+            TestimonialDTO finalDTO = processFinalContent(optimizedContent, inputText);
+            
+            System.out.println("✅ Generazione completata con sistema di raffinamento a 3 livelli!");
+            return finalDTO;
+            
+        } catch (Exception e) {
+            System.err.println("❌ Errore generazione: " + e.getMessage());
+            // ✅ RILASCIA RISORSE IN CASO DI ERRORE
+            activeRequests.decrementAndGet();
+            return createEnhancedFallbackDTO(inputText);
+        }
     }
 
-    // 🎯 1. GENERAZIONE PRIMARIA - Sistema avanzato
+    // ✅ GESTIONE CONCORRENZA
+    private boolean canProcessRequest(int estimatedTokens) {
+        // 1. Verifica limite concorrenza
+        if (activeRequests.get() >= MAX_CONCURRENT_REQUESTS) {
+            System.out.println("🚨 Limite concorrenza raggiunto: " + activeRequests.get() + "/" + MAX_CONCURRENT_REQUESTS);
+            return false;
+        }
+        
+        // 2. Verifica limite token/minuto
+        long currentTokens = tokensThisMinute.get();
+        long projectedTokens = currentTokens + estimatedTokens;
+        
+        if (projectedTokens > 28000) { // Margine sicurezza del 7%
+            System.out.println("🚨 Limite token quasi raggiunto: " + projectedTokens + "/30000 TPM");
+            return false;
+        }
+        
+        activeRequests.incrementAndGet();
+        System.out.println("📈 Richiesta accettata. Concorrenza: " + activeRequests.get() + "/" + MAX_CONCURRENT_REQUESTS + 
+                          " | Token stimati: " + projectedTokens + "/30000");
+        return true;
+    }
+    
+    // ✅ REGISTRAZIONE UTILIZZO
+    private void recordTokenUsage(int tokens) {
+        long currentUsage = tokensThisMinute.addAndGet(tokens);
+        activeRequests.decrementAndGet();
+        
+        double usagePercentage = (currentUsage / 30000.0) * 100;
+        System.out.println("📊 Token utilizzati: " + currentUsage + "/30000 (" + String.format("%.1f", usagePercentage) + "%)");
+        
+        if (usagePercentage > 80) {
+            System.out.println("⚠️  Attenzione: utilizzo token superiore all'80%");
+        }
+    }
+
+    // 🎯 1. GENERAZIONE PRIMARIA - Sistema avanzato (TUO CODICE ORIGINALE)
     private String generateInitialPosts(String inputText, String platform, String postType,
             int emotion, int creativity, int formality, int urgency, int length, 
             BrandProfile brandProfile, RestTemplate restTemplate) {
@@ -125,7 +203,7 @@ public class LLMService {
         return callGroqAPI(prompt, restTemplate, "Generazione primaria avanzata");
     }
 
-    // 🔍 2. LAYER DI RAFFINAMENTO QUALITATIVO
+    // 🔍 2. LAYER DI RAFFINAMENTO QUALITATIVO (TUO CODICE ORIGINALE)
     private String qualityRefinementLayer(String initialContent, String originalInput, 
             BrandProfile brandProfile, String platform, RestTemplate restTemplate) {
         
@@ -195,7 +273,7 @@ public class LLMService {
         return callGroqAPI(refinementPrompt, restTemplate, "Raffinamento qualitativo");
     }
 
-    // 🎨 3. LAYER DI OTTIMIZZAZIONE FINALE
+    // 🎨 3. LAYER DI OTTIMIZZAZIONE FINALE (TUO CODICE ORIGINALE)
     private String finalOptimizationLayer(String refinedContent, BrandProfile brandProfile, 
             String platform, String postType, RestTemplate restTemplate) {
         
@@ -258,38 +336,7 @@ public class LLMService {
         return callGroqAPI(optimizationPrompt, restTemplate, "Ottimizzazione finale");
     }
     
-    // 🎨 PROCESSING FINALE MIGLIORATO
-    private TestimonialDTO processFinalContent(String optimizedContent, String inputText) {
-        try {
-            String cleanContent = optimizedContent
-                .replaceAll("(?i)```json", "")
-                .replaceAll("```", "")
-                .trim();
-                
-            JsonNode root = mapper.readTree(cleanContent);
-            
-            // Estrae il contenuto dai vari layer di nesting
-            JsonNode contentNode = extractContentNode(root);
-            
-            TestimonialDTO dto = new TestimonialDTO();
-            dto.setInputText(inputText);
-            dto.setSocialPostVersions(extractList(contentNode, "socialPostVersions"));
-            dto.setHeadlineVersions(extractList(contentNode, "headlineVersions"));
-            dto.setShortQuoteVersions(extractList(contentNode, "shortQuoteVersions"));
-            dto.setCallToActionVersions(extractList(contentNode, "callToActionVersions"));
-            
-            // Log delle metriche di qualità
-            logQualityMetrics(root);
-            
-            return dto;
-            
-        } catch (Exception e) {
-            System.err.println("❌ Errore processing finale: " + e.getMessage());
-            return createEnhancedFallbackDTO(inputText);
-        }
-    }
-
-    // 🔧 METODO UNIFICATO PER CHIAMATE API
+    // 🔧 METODO API MIGLIORATO
     private String callGroqAPI(String prompt, RestTemplate restTemplate, String phase) {
         System.out.println("🔄 " + phase + ": Invio richiesta a Groq...");
         
@@ -304,7 +351,8 @@ public class LLMService {
                 Map.of("role", "user", "content", prompt)
             },
             "temperature", 0.7,
-            "max_tokens", 2500,
+            "max_tokens", 2800, // Aumentato per contenuti più ricchi
+            "top_p", 0.9,
             "response_format", Map.of("type", "json_object")
         );
 
@@ -313,21 +361,52 @@ public class LLMService {
             ResponseEntity<Map> response = restTemplate.exchange(GROQ_URL, HttpMethod.POST, request, Map.class);
             
             if (response.getBody() == null || !response.getBody().containsKey("choices")) {
-                throw new RuntimeException("Risposta API vuota");
+                throw new RuntimeException("Risposta API vuota o malformata");
             }
             
             String content = (String) ((Map) ((Map) ((List<?>) response.getBody().get("choices")).get(0)).get("message")).get("content");
-            System.out.println("✅ " + phase + ": Risposta ricevuta");
+            System.out.println("✅ " + phase + ": Risposta ricevuta con successo");
             
             return content;
             
         } catch (Exception e) {
             System.err.println("❌ Errore in " + phase + ": " + e.getMessage());
-            throw new RuntimeException("Fallita fase: " + phase);
+            // ✅ RILASCIA SEMAFORO IN CASO DI ERRORE
+            activeRequests.decrementAndGet();
+            throw new RuntimeException("Fallita fase: " + phase, e);
+        }
+    }
+    
+    // 🎨 PROCESSING FINALE MIGLIORATO (IL RESTO DEL TUO CODICE RIMANE INVARIATO)
+    private TestimonialDTO processFinalContent(String optimizedContent, String inputText) {
+        try {
+            String cleanContent = optimizedContent
+                .replaceAll("(?i)```json", "")
+                .replaceAll("```", "")
+                .trim();
+                
+            JsonNode root = mapper.readTree(cleanContent);
+            
+            JsonNode contentNode = extractContentNode(root);
+            
+            TestimonialDTO dto = new TestimonialDTO();
+            dto.setInputText(inputText);
+            dto.setSocialPostVersions(extractList(contentNode, "socialPostVersions"));
+            dto.setHeadlineVersions(extractList(contentNode, "headlineVersions"));
+            dto.setShortQuoteVersions(extractList(contentNode, "shortQuoteVersions"));
+            dto.setCallToActionVersions(extractList(contentNode, "callToActionVersions"));
+            
+            logQualityMetrics(root);
+            
+            return dto;
+            
+        } catch (Exception e) {
+            System.err.println("❌ Errore processing finale: " + e.getMessage());
+            return createEnhancedFallbackDTO(inputText);
         }
     }
 
-    // 🧠 SYSTEM PROMPT AVANZATO
+    // 🧠 SYSTEM PROMPT AVANZATO (MANTENUTO)
     private String buildEnhancedSystemPrompt() {
         return """
             Sei un ESPERTO DI COMUNICAZIONE STRATEGICA specializzato in:
@@ -358,7 +437,7 @@ public class LLMService {
             """;
     }
 
-    // 🏗️ CONTESTO BRAND AVANZATO
+    // 🏗️ CONTESTO BRAND AVANZATO (MANTENUTO)
     private String buildEnhancedBrandContext(BrandProfile brand) {
         if (brand == null) return buildGenericBrandContext();
         
@@ -405,7 +484,7 @@ public class LLMService {
         );
     }
 
-    // ✅ NUOVO: Contesto brand generico avanzato
+    // ✅ CONTESTO BRAND GENERICO (MANTENUTO)
     private String buildGenericBrandContext() {
         return """
             🏢 ECOSISTEMA BRAND - PROFILO GENERICO AVANZATO:
@@ -434,7 +513,13 @@ public class LLMService {
             """;
     }
 
-    // 🎪 METODI DI SUPPORTO AVANZATI
+    // ... (MANTIENI TUTTI GLI ALTRI METODI DI SUPPORTO ESISTENTI)
+    // extractContentNode, logQualityMetrics, createEnhancedFallbackDTO,
+    // getEmotionDescription, getCreativityDescription, getFormalityDescription,
+    // getUrgencyDescription, getLengthDescription, getToneStrategicGuidance,
+    // getBrandPersonality, getCommunicationApproach, getTechnicalityLevel,
+    // getNarrativeStyle, getBrandCTAs, extractList
+
     private JsonNode extractContentNode(JsonNode root) {
         if (root.has("optimizedContent")) return root.get("optimizedContent");
         if (root.has("refinedContent")) return root.get("refinedContent");
@@ -459,7 +544,6 @@ public class LLMService {
         }
     }
 
-    // ✅ NUOVO: DTO di fallback avanzato
     private TestimonialDTO createEnhancedFallbackDTO(String inputText) {
         TestimonialDTO dto = new TestimonialDTO();
         dto.setInputText(inputText);
@@ -486,7 +570,6 @@ public class LLMService {
         return dto;
     }
 
-    // 🎪 DESCRIZIONI PARAMETRICHE AVANZATE
     private String getEmotionDescription(int emotion) {
         if (emotion <= 20) return "Razionale e analitico - Focus su logica e dati";
         if (emotion <= 40) return "Positivo e ottimista - Linguaggio costruttivo e forward-looking"; 
@@ -527,7 +610,6 @@ public class LLMService {
         return "Esteso e completo (800+) - Comunicazione comprehensive e exhaustive";
     }
 
-    // ✅ NUOVO: Metodi di supporto strategico
     private String getToneStrategicGuidance(Object tone) {
         return switch (tone.toString().toLowerCase()) {
             case "professional" -> "Autorevolezza bilanciata con accessibilità - Competenza che ispira fiducia";
@@ -594,7 +676,6 @@ public class LLMService {
         };
     }
 
-    // ✅ NUOVO: Call-to-action brand-specifiche
     private String getBrandCTAs(BrandProfile brand) {
         if (brand.getPreferredCTAs() != null && !brand.getPreferredCTAs().isEmpty()) {
             return String.join(", ", brand.getPreferredCTAs());
@@ -602,7 +683,6 @@ public class LLMService {
         return "Scopri di più, Inizia il percorso, Unisciti alla community, Contattaci per approfondire";
     }
 
-    // ✅ MIGLIORATO: Extract list con robustezza avanzata
     private List<String> extractList(JsonNode root, String key) {
         try {
             JsonNode arr = root.get(key);
@@ -616,7 +696,6 @@ public class LLMService {
                         }
                     }
                 }
-                // Assicura almeno 3 elementi di qualità
                 while (result.size() < 3) {
                     result.add("Versione " + (result.size() + 1) + " - Contenuto ottimizzato in fase di generazione");
                 }
@@ -626,21 +705,460 @@ public class LLMService {
             System.err.println("⚠️ Errore estrazione lista per " + key + ": " + e.getMessage());
         }
         
-        // Fallback avanzato
         return Arrays.asList(
             "Esplora nuove possibilità con il nostro approccio innovativo",
             "Scopri come trasformare la tua esperienza in risultati straordinari", 
             "Unisciti a chi già vive un percorso di eccellenza e innovazione"
         );
-    }
-
-    // ✅ Istruzioni piattaforma (mantenute per compatibilità)
-    private String getPlatformSpecificInstructions(String platform, String postType) {
-        // Implementazione esistente mantenuta per compatibilità
-        return "Piattaforma: " + platform + " - Tipo: " + (postType != null ? postType : "Generico");
+    } */
+    
+    
+    
+    @PostConstruct
+    public void init() {
+        tokenMonitor.scheduleAtFixedRate(() -> {
+            long previous = tokensThisMinute.getAndSet(0);
+            if (previous > 0) {
+                System.out.println("🔄 Token contatore resettato. Precedente: " + previous);
+            }
+        }, 1, 1, TimeUnit.MINUTES);
     }
     
-    private String getPostTypeInstructions(String postType) {
-        return "Tipo contenuto: " + postType;
+    public TestimonialDTO generate(String inputText, String platform, String postType,
+            int emotion, int creativity, int formality, int urgency, int length, BrandProfile brandProfile) {
+        
+        // ✅ STIMA TOKEN RIDOTTA: 2800 invece di 7000
+        if (!canProcessRequest(2800)) {
+            throw new RuntimeException("Servizio occupato. Riprova tra qualche secondo.");
+        }
+        
+        RestTemplate restTemplate = new RestTemplate();
+
+        try {
+            // 🎯 SISTEMA OTTIMIZZATO A 3 FASI MA CON PROMPT COMPATTI
+            String initialContent = generateCompactInitialContent(inputText, platform, postType, 
+                emotion, creativity, formality, urgency, length, brandProfile, restTemplate);
+            
+            String refinedContent = compactRefinementLayer(initialContent, inputText, brandProfile, platform, restTemplate);
+            
+            String optimizedContent = compactOptimizationLayer(refinedContent, brandProfile, platform, postType, restTemplate);
+            
+            // ✅ REGISTRA UTILIZZO TOKEN RIDOTTO
+            recordTokenUsage(2800);
+            
+            TestimonialDTO finalDTO = processFinalContent(optimizedContent, inputText);
+            
+            System.out.println("✅ Generazione completata (2.8k token)!");
+            return finalDTO;
+            
+        } catch (Exception e) {
+            System.err.println("❌ Errore generazione: " + e.getMessage());
+            activeRequests.decrementAndGet();
+            return createEnhancedFallbackDTO(inputText);
+        }
+    }
+
+    // ✅ GESTIONE CONCORRENZA OTTIMIZZATA
+    private boolean canProcessRequest(int estimatedTokens) {
+        if (activeRequests.get() >= MAX_CONCURRENT_REQUESTS) {
+            System.out.println("🚨 Limite concorrenza: " + activeRequests.get() + "/" + MAX_CONCURRENT_REQUESTS);
+            return false;
+        }
+        
+        long currentTokens = tokensThisMinute.get();
+        long projectedTokens = currentTokens + estimatedTokens;
+        
+        if (projectedTokens > 28000) {
+            System.out.println("🚨 Limite token: " + projectedTokens + "/30000 TPM");
+            return false;
+        }
+        
+        activeRequests.incrementAndGet();
+        System.out.println("📈 Richiesta accettata. Concorrenza: " + activeRequests.get() + "/" + MAX_CONCURRENT_REQUESTS + 
+                          " | Token: " + projectedTokens + "/30000");
+        return true;
+    }
+    
+    private void recordTokenUsage(int tokens) {
+        long currentUsage = tokensThisMinute.addAndGet(tokens);
+        activeRequests.decrementAndGet();
+        
+        double usagePercentage = (currentUsage / 30000.0) * 100;
+        System.out.println("📊 Token usati: " + currentUsage + "/30000 (" + String.format("%.1f", usagePercentage) + "%)");
+        
+        if (usagePercentage > 80) {
+            System.out.println("⚠️  Attenzione: utilizzo token >80%");
+        }
+    }
+
+    // 🎯 1. GENERAZIONE PRIMARIA COMPATTA (~800 token)
+    private String generateCompactInitialContent(String inputText, String platform, String postType,
+            int emotion, int creativity, int formality, int urgency, int length, 
+            BrandProfile brandProfile, RestTemplate restTemplate) {
+        
+        String prompt = """
+            CONTESTO: %s
+            INPUT: %s
+            PIATTAFORMA: %s
+            TIPO: %s
+            
+            PARAMETRI CREATIVI:
+            - Emozione: %d/100 (%s)
+            - Creatività: %d/100 (%s)
+            - Formalità: %d/100 (%s)
+            - Urgenza: %d/100 (%s)
+            - Lunghezza: %d/100 (%s)
+            
+            GENERA 3 VERSIONI DISTINTE:
+            
+            JSON OUTPUT:
+            {
+              "socialPostVersions": [
+                "narrativa emozionale...",
+                "value proposition...", 
+                "conversation starter..."
+              ],
+              "headlineVersions": [
+                "Headline narrativa",
+                "Headline value", 
+                "Headline conversazionale"
+              ],
+              "shortQuoteVersions": [
+                "Quote emozionale",
+                "Quote value",
+                "Quote insight"
+              ],
+              "callToActionVersions": [
+                "CTA coinvolgente",
+                "CTA persuasiva",
+                "CTA interattiva"
+              ]
+            }
+            """.formatted(
+                buildCompactBrandContext(brandProfile),
+                inputText.length() > 400 ? inputText.substring(0, 400) + "..." : inputText, // Limita input
+                platform.toUpperCase(),
+                postType != null ? postType : "Social Post",
+                emotion, getCompactEmotionDesc(emotion),
+                creativity, getCompactCreativityDesc(creativity),
+                formality, getCompactFormalityDesc(formality),
+                urgency, getCompactUrgencyDesc(urgency),
+                length, getCompactLengthDesc(length)
+            );
+        
+        return callGroqAPI(prompt, restTemplate, "Generazione primaria compatta", 1200);
+    }
+
+    // 🔍 2. LAYER DI RAFFINAMENTO COMPATTO (~800 token)
+    private String compactRefinementLayer(String initialContent, String originalInput, 
+            BrandProfile brandProfile, String platform, RestTemplate restTemplate) {
+        
+        String refinementPrompt = """
+            ANALISI E RAFFINAMENTO CONTENUTO:
+            
+            CONTENUTO DA MIGLIORARE: %s
+            
+            CONTESTO BRAND: %s
+            INPUT ORIGINALE: %s
+            PIATTAFORMA: %s
+            
+            OBIETTIVI RAFFINAMENTO:
+            1. Migliora coerenza con brand identity
+            2. Ottimizza per piattaforma target
+            3. Rafforza diversità tra versioni
+            4. Migliora fluidità e impatto
+            
+            OUTPUT FORMAT:
+            {
+              "refinedContent": {
+                "socialPostVersions": ["v1 raffinata...", "v2 raffinata...", "v3 raffinata..."],
+                "headlineVersions": ["h1 raffinata...", "h2 raffinata...", "h3 raffinata..."],
+                "shortQuoteVersions": ["q1 raffinata...", "q2 raffinata...", "q3 raffinata..."],
+                "callToActionVersions": ["cta1 raffinata...", "cta2 raffinata...", "cta3 raffinata..."]
+              },
+              "improvements": ["Coerenza brand", "Ottimizzazione piattaforma"]
+            }
+            """.formatted(
+                initialContent.length() > 600 ? initialContent.substring(0, 600) + "..." : initialContent,
+                buildCompactBrandContext(brandProfile),
+                originalInput.length() > 200 ? originalInput.substring(0, 200) + "..." : originalInput,
+                platform
+            );
+        
+        return callGroqAPI(refinementPrompt, restTemplate, "Raffinamento compatta", 1000);
+    }
+
+    // 🎨 3. LAYER DI OTTIMIZZAZIONE COMPATTA (~800 token)
+    private String compactOptimizationLayer(String refinedContent, BrandProfile brandProfile, 
+            String platform, String postType, RestTemplate restTemplate) {
+        
+        String optimizationPrompt = """
+            OTTIMIZZAZIONE FINALE CONTENUTO:
+            
+            CONTENUTO: %s
+            
+            CONTESTO: %s
+            PIATTAFORMA: %s
+            TIPO: %s
+            
+            OTTIMIZZAZIONI APPLICARE:
+            • Fluidità lettura e ritmo
+            • Impatto emozionale
+            • Efficacia persuasiva
+            • Adattamento piattaforma
+            
+            OUTPUT FORMAT:
+            {
+              "optimizedContent": {
+                "socialPostVersions": ["v1 ottimizzata...", "v2 ottimizzata...", "v3 ottimizzata..."],
+                "headlineVersions": ["h1 ottimizzata...", "h2 ottimizzata...", "h3 ottimizzata..."],
+                "shortQuoteVersions": ["q1 ottimizzata...", "q2 ottimizzata...", "q3 ottimizzata..."],
+                "callToActionVersions": ["cta1 ottimizzata...", "cta2 ottimizzata...", "cta3 ottimizzata..."]
+              },
+              "optimizationScore": 92
+            }
+            """.formatted(
+                refinedContent.length() > 500 ? refinedContent.substring(0, 500) + "..." : refinedContent,
+                buildCompactBrandContext(brandProfile),
+                platform,
+                postType != null ? postType : "Social"
+            );
+        
+        return callGroqAPI(optimizationPrompt, restTemplate, "Ottimizzazione compatta", 1000);
+    }
+    
+    // 🔧 METODO API OTTIMIZZATO
+    private String callGroqAPI(String prompt, RestTemplate restTemplate, String phase, int maxTokens) {
+        System.out.println("🔄 " + phase + ": Invio richiesta...");
+        
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(groqApiKey);
+
+        Map<String, Object> body = Map.of(
+            "model", "llama-3.1-8b-instant",
+            "messages", new Object[]{
+                Map.of("role", "system", "content", buildCompactSystemPrompt()),
+                Map.of("role", "user", "content", prompt)
+            },
+            "temperature", 0.7,
+            "max_tokens", maxTokens,
+            "top_p", 0.9,
+            "response_format", Map.of("type", "json_object")
+        );
+
+        try {
+            HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
+            ResponseEntity<Map> response = restTemplate.exchange(GROQ_URL, HttpMethod.POST, request, Map.class);
+            
+            if (response.getBody() == null || !response.getBody().containsKey("choices")) {
+                throw new RuntimeException("Risposta API vuota");
+            }
+            
+            String content = (String) ((Map) ((Map) ((List<?>) response.getBody().get("choices")).get(0)).get("message")).get("content");
+            System.out.println("✅ " + phase + ": Successo");
+            
+            return content;
+            
+        } catch (Exception e) {
+            System.err.println("❌ Errore in " + phase + ": " + e.getMessage());
+            activeRequests.decrementAndGet();
+            throw new RuntimeException("Fallita fase: " + phase, e);
+        }
+    }
+    
+    // 🧠 SYSTEM PROMPT COMPATTO
+    private String buildCompactSystemPrompt() {
+        return """
+            Sei un copywriter esperto. Crea contenuti social di alta qualità.
+            
+            COMPETENZE:
+            • Copywriting strategico
+            • Adattamento multi-piattaforma  
+            • Ottimizzazione engagement
+            • Coerenza brand identity
+            
+            PRINCIPI:
+            - Qualità sopra quantità
+            - Coerenza con contesto
+            - Diversità approcci
+            - Ottimizzazione tecnica
+            
+            FORMATO: Restituisci SEMPRE JSON valido.
+            """;
+    }
+
+    // 🏗️ CONTESTO BRAND COMPATTO
+    private String buildCompactBrandContext(BrandProfile brand) {
+        if (brand == null) return "Brand: Generico | Tono: Professionale | Target: Clienti generali";
+        
+        return String.format("""
+            BRAND: %s
+            DESCRIZIONE: %s
+            VALORI: %s
+            TONO: %s
+            TARGET: %s
+            KEYWORDS: %s
+            """,
+            brand.getBrandName(),
+            brand.getBrandDescription() != null ? 
+                (brand.getBrandDescription().length() > 100 ? 
+                 brand.getBrandDescription().substring(0, 100) + "..." : brand.getBrandDescription()) 
+                : "Non specificato",
+            brand.getBrandValues() != null ? 
+                (brand.getBrandValues().length() > 80 ? 
+                 brand.getBrandValues().substring(0, 80) + "..." : brand.getBrandValues()) 
+                : "Professionalità, Qualità",
+            brand.getTone() != null ? brand.getTone().toString() : "Professionale",
+            brand.getTargetAudience() != null ? 
+                (brand.getTargetAudience().length() > 60 ? 
+                 brand.getTargetAudience().substring(0, 60) + "..." : brand.getTargetAudience()) 
+                : "Clienti generali",
+            brand.getPreferredKeywords() != null ? 
+                String.join(", ", brand.getPreferredKeywords().stream()
+                    .limit(5)
+                    .toList()) 
+                : "qualità, innovazione, risultato"
+        );
+    }
+
+    // 🎯 PROCESSING FINALE (MANTENUTO)
+    private TestimonialDTO processFinalContent(String optimizedContent, String inputText) {
+        try {
+            String cleanContent = optimizedContent
+                .replaceAll("(?i)```json", "")
+                .replaceAll("```", "")
+                .trim();
+                
+            JsonNode root = mapper.readTree(cleanContent);
+            
+            JsonNode contentNode = extractContentNode(root);
+            
+            TestimonialDTO dto = new TestimonialDTO();
+            dto.setInputText(inputText);
+            dto.setSocialPostVersions(extractList(contentNode, "socialPostVersions"));
+            dto.setHeadlineVersions(extractList(contentNode, "headlineVersions"));
+            dto.setShortQuoteVersions(extractList(contentNode, "shortQuoteVersions"));
+            dto.setCallToActionVersions(extractList(contentNode, "callToActionVersions"));
+            
+            logCompactMetrics(root);
+            
+            return dto;
+            
+        } catch (Exception e) {
+            System.err.println("❌ Errore processing: " + e.getMessage());
+            return createEnhancedFallbackDTO(inputText);
+        }
+    }
+
+    private void logCompactMetrics(JsonNode root) {
+        if (root.has("optimizationScore")) {
+            System.out.println("📊 Ottimizzazione: " + root.get("optimizationScore").asInt() + "/100");
+        }
+        if (root.has("improvements")) {
+            System.out.println("📈 Miglioramenti: " + root.get("improvements"));
+        }
+    }
+
+    // 🎪 METODI DI SUPPORTO COMPATTI
+    private String getCompactEmotionDesc(int emotion) {
+        if (emotion <= 20) return "Razionale";
+        if (emotion <= 40) return "Positivo"; 
+        if (emotion <= 60) return "Empatico";
+        if (emotion <= 80) return "Passionale";
+        return "Emozionale";
+    }
+
+    private String getCompactCreativityDesc(int creativity) {
+        if (creativity <= 20) return "Strutturato";
+        if (creativity <= 40) return "Innovativo"; 
+        if (creativity <= 60) return "Creativo";
+        if (creativity <= 80) return "Innovativo+";
+        return "Estremamente creativo";
+    }
+
+    private String getCompactFormalityDesc(int formality) {
+        if (formality <= 20) return "Informale";
+        if (formality <= 40) return "Semi-informale";
+        if (formality <= 60) return "Bilanciato";
+        if (formality <= 80) return "Formale";
+        return "Molto formale";
+    }
+    
+    private String getCompactUrgencyDesc(int urgency) {
+        if (urgency <= 20) return "Riflessivo";
+        if (urgency <= 40) return "Suggerimento";
+        if (urgency <= 60) return "Invito chiaro";
+        if (urgency <= 80) return "Urgenza strategica";
+        return "Urgenza massima";
+    }
+    
+    private String getCompactLengthDesc(int length) {
+        if (length <= 20) return "Micro";
+        if (length <= 40) return "Breve";
+        if (length <= 60) return "Medio";
+        if (length <= 80) return "Approfondito";
+        return "Esteso";
+    }
+
+    private JsonNode extractContentNode(JsonNode root) {
+        if (root.has("optimizedContent")) return root.get("optimizedContent");
+        if (root.has("refinedContent")) return root.get("refinedContent");
+        return root;
+    }
+
+    private TestimonialDTO createEnhancedFallbackDTO(String inputText) {
+        TestimonialDTO dto = new TestimonialDTO();
+        dto.setInputText(inputText);
+        dto.setSocialPostVersions(Arrays.asList(
+            "Scopri come la nostra innovazione trasforma esperienze in risultati straordinari...",
+            "Risultati eccezionali nascono da approcci fuori dall'ordinario - ecco la nostra vision...",
+            "Immagina un percorso che supera ogni aspettativa. Inizia qui la trasformazione..."
+        ));
+        dto.setHeadlineVersions(Arrays.asList(
+            "Innovazione che trasforma esperienze",
+            "Dall'idea all'eccellenza: il percorso vincente", 
+            "Oltre le aspettative: qualità e innovazione"
+        ));
+        dto.setShortQuoteVersions(Arrays.asList(
+            "Trasformazione come scelta consapevole",
+            "Risultati straordinari da approcci unici",
+            "Innovazione che trasforma il modo di pensare"
+        ));
+        dto.setCallToActionVersions(Arrays.asList(
+            "Inizia il viaggio verso risultati straordinari",
+            "Pronto a trasformare? Il primo passo inizia qui",
+            "Unisciti a chi vede risultati eccezionali"
+        ));
+        return dto;
+    }
+
+    private List<String> extractList(JsonNode root, String key) {
+        try {
+            JsonNode arr = root.get(key);
+            if (arr != null && arr.isArray()) {
+                List<String> result = new ArrayList<>();
+                for (JsonNode node : arr) {
+                    if (node.isTextual()) {
+                        String text = node.asText().trim();
+                        if (!text.isEmpty()) {
+                            result.add(text);
+                        }
+                    }
+                }
+                while (result.size() < 3) {
+                    result.add("Versione " + (result.size() + 1) + " - Contenuto generato");
+                }
+                return result;
+            }
+        } catch (Exception e) {
+            System.err.println("⚠️ Errore estrazione " + key + ": " + e.getMessage());
+        }
+        
+        return Arrays.asList(
+            "Esplora nuove possibilità con approccio innovativo",
+            "Scopri come trasformare esperienza in risultati", 
+            "Unisciti a percorso di eccellenza e innovazione"
+        );
     }
 }

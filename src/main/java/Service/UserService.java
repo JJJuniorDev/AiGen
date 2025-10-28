@@ -46,7 +46,7 @@ this.passwordEncoder = passwordEncoder;
     }
 
     public Optional<User> findByEmail(String email) {
-        return userRepository.findByEmail(email);
+        return userRepository.findByEmailWithAllFields(email);
     }
 
     public Optional<User> findById(Long id) {

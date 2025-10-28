@@ -19,8 +19,8 @@ public class User {
     @Column(nullable = false)
     private String plan = "FREE";
 
-    @Column(nullable = false)
-    private Integer credits = 10;
+    @Column( nullable = false)
+    private Integer credits;
 
     private String brandLogoUrl;
     private String primaryColor;

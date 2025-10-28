@@ -2,6 +2,7 @@ package Controller;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.Map;
 import java.util.Optional;
 
 import org.springframework.http.ResponseEntity;
@@ -43,7 +44,7 @@ public class TestimonialController {
     }
 
     @PostMapping("/generate")
-    public ResponseEntity<TestimonialDTO> generate(@RequestBody TestimonialDTO req) {
+    public ResponseEntity<?> generate(@RequestBody TestimonialDTO req) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || auth.getPrincipal() == null) return ResponseEntity.status(401).build();
 
@@ -78,7 +79,7 @@ public class TestimonialController {
                 return ResponseEntity.status(403).build();
             }
         }
-        
+        try {
         // mock LLM call
         TestimonialDTO gen = llmService.generate(
         		req.getInputText(),
@@ -104,6 +105,25 @@ public class TestimonialController {
 
 
         return ResponseEntity.ok(DtoMapper.toDTO(saved));
+    } catch (RuntimeException e) {
+    	   // ✅ GESTIONE SPECIFICA PER SERVIZIO OCCUPATO
+        if (e.getMessage().contains("Servizio temporaneamente occupato")) {
+            return ResponseEntity.status(429) // 429 Too Many Requests
+                .body(Map.of(
+                    "error", "service_busy",
+                    "message", "Il servizio è temporaneamente occupato",
+                    "retry_after", 30,
+                    "suggestion", "Riprova tra 30 secondi"
+                ));
+        }
+         // ✅ ALTRI ERRORI
+            return ResponseEntity.status(503)
+                .body(Map.of(
+                    "error", "generation_failed", 
+                    "message", "Errore durante la generazione del contenuto"
+                ));
+        
+    }
     }
     
     private TestimonialDTO createNoCreditsResponse() {

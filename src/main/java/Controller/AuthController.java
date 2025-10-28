@@ -48,11 +48,31 @@ public class AuthController {
         Optional<User> o = userService.findByEmail(req.getEmail());
         if (o.isEmpty()) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         User user = o.get();
+        System.out.println("✅ User found:");
+        System.out.println("   ID: " + user.getId());
+        System.out.println("   Email: " + user.getEmail());
+        System.out.println("   Credits: " + user.getCredits());
+        System.out.println("   Credits class: " + (user.getCredits() != null ? user.getCredits().getClass() : "null"));
+        System.out.println("   Plan: " + user.getPlan());
+        System.out.println("   MaxBrands: " + user.getMaxBrands());
+        System.out.println("   Active: " + user.getActive());
+        // Verifica se è un proxy
+        if (org.hibernate.Hibernate.isInitialized(user)) {
+            System.out.println("   ✅ User is initialized");
+        } else {
+            System.out.println("   ❌ User is NOT initialized (proxy)");
+        }
+        
         if (!userService.matchesPassword(user, req.getPassword())) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
         String token = jwtUtil.generateToken(user.getId().toString());
         UserDTO dto = DtoMapper.toDTO(user);
+        // Debug del DTO
+        System.out.println("=== DTO MAPPING ===");
+        System.out.println("   DTO Credits: " + dto.getCredits());
+        System.out.println("   DTO ID: " + dto.getId());
+        System.out.println("   DTO Email: " + dto.getEmail());
         return ResponseEntity.ok(new AuthResponse(token, dto));
     }
 }
