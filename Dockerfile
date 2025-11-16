@@ -5,4 +5,4 @@ RUN mvn clean package -DskipTests
 FROM eclipse-temurin:21-jdk-alpine
 COPY --from=build /target/*.jar app.jar
 ENV SPRING_PROFILES_ACTIVE=prod
-ENTRYPOINT ["java","-Dserver.port=8080","-jar","/app.jar"]
+ENTRYPOINT ["java", "-Dserver.address=0.0.0.0", "-Dserver.port=8080", "-jar", "/app.jar"]
