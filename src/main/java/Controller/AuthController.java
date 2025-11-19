@@ -1,13 +1,17 @@
 package Controller;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import Config.JwtUtil;
@@ -41,6 +45,35 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.CONFLICT).build();
         }
     }
+    
+    @GetMapping("/verify-email")
+    public  ResponseEntity<Map<String, Object>>  verifyEmail(@RequestParam String token) {
+        boolean verified = userService.verifyEmail(token);
+        Map<String, Object> response = new HashMap<>();
+        if (verified) {
+            response.put("success", true);
+            response.put("message", "Email verificata con successo");
+            return ResponseEntity.ok(response);
+        } else {
+            response.put("success", false);
+            response.put("message", "Link di verifica non valido o scaduto");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        }
+    }
+    
+    @PostMapping("/resend-verification")
+    public ResponseEntity<String> resendVerification(@RequestBody Map<String, String> request) {
+        String email = request.get("email");
+        boolean sent = userService.resendVerificationEmail(email);
+        
+        if (sent) {
+            return ResponseEntity.ok("Email di verifica inviata con successo.");
+        } else {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("Impossibile inviare l'email di verifica. Verifica l'email inserita.");
+        }
+    }
+
 
     @CrossOrigin(origins = "http://localhost:4200", allowCredentials = "true")
     @PostMapping("/login")

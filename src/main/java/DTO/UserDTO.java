@@ -7,6 +7,7 @@ public class UserDTO {
     private Integer credits;
     private String brandLogoUrl;
     private String primaryColor;
+    private Boolean emailVerified;
 	public String getId() {
 		return id;
 	}
@@ -42,6 +43,12 @@ public class UserDTO {
 	}
 	public void setPrimaryColor(String primaryColor) {
 		this.primaryColor = primaryColor;
+	}
+	public Boolean getEmailVerified() {
+		return emailVerified;
+	}
+	public void setEmailVerified(Boolean emailVerified) {
+		this.emailVerified = emailVerified;
 	}
 
 

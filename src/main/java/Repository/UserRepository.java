@@ -14,6 +14,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
  // ✅ Prova con una query esplicita
   //  @Query("SELECT u FROM User u WHERE u.email = :email")
     // AGGIUNGI QUESTO
-    @Query(value = "SELECT id, email, credits, plan, password_hash, created_at, updated_at, max_brands, active, brand_logo_url, primary_color, stripe_customer_id FROM users WHERE email = :email", nativeQuery = true)
+    @Query(value = "SELECT id, email, credits, plan, password_hash, created_at, updated_at, max_brands, active, brand_logo_url, primary_color, stripe_customer_id, email_verification_token, email_verified, token_created_at FROM users WHERE email = :email", nativeQuery = true)
     Optional<User> findByEmailWithAllFields(@Param("email") String email);
+
+    @Query(value = "SELECT * FROM users WHERE email_verification_token = :token", nativeQuery = true)
+    Optional<User> findByEmailVerificationToken(@Param("token") String token);
+    
 }

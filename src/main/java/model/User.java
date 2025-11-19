@@ -37,6 +37,15 @@ public class User {
 
     private String stripeCustomerId; // Per i pagamenti
     
+    @Column(name = "email_verified")
+    private Boolean emailVerified = false;
+    
+    @Column(name = "email_verification_token")
+    private String emailVerificationToken;
+    
+    @Column(name = "token_created_at")
+    private LocalDateTime tokenCreatedAt;
+    
 	public Long getId() {
 		return id;
 	}
@@ -153,4 +162,30 @@ public class User {
 	                this.maxBrands = 3;
 	        }
 	    }
+
+	 public Boolean getEmailVerified() {
+		 return emailVerified;
+	 }
+
+	 public void setEmailVerified(Boolean emailVerified) {
+		 this.emailVerified = emailVerified;
+	 }
+
+	 public String getEmailVerificationToken() {
+		 return emailVerificationToken;
+	 }
+
+	 public void setEmailVerificationToken(String emailVerificationToken) {
+		 this.emailVerificationToken = emailVerificationToken;
+	 }
+
+	 public LocalDateTime getTokenCreatedAt() {
+		 return tokenCreatedAt;
+	 }
+
+	 public void setTokenCreatedAt(LocalDateTime tokenCreatedAt) {
+		 this.tokenCreatedAt = tokenCreatedAt;
+	 }
+	 
+	 
 }

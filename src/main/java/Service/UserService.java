@@ -3,6 +3,7 @@ package Service;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
+import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -24,6 +25,11 @@ public class UserService {
     
     private final PasswordEncoder passwordEncoder;
 
+    @Autowired
+    private EmailService emailService;
+    
+    private static final int TOKEN_EXPIRATION_HOURS = 24;
+    
     public UserService(PasswordEncoder passwordEncoder) {
 this.passwordEncoder = passwordEncoder;
 }
@@ -36,15 +42,75 @@ this.passwordEncoder = passwordEncoder;
         user.setEmail(email);
         user.setPasswordHash(passwordEncoder.encode(password));
         user.setPlan("FREE");
-        user.setCredits(5);
-        user.setMaxBrands(1); //FREE PLAN LIMIT
- User savedUser = userRepository.save(user);
+        user.setCredits(0); // ✅ NON dare crediti finché l'email non è verificata
+         user.setMaxBrands(1); //FREE PLAN LIMIT
+         user.setEmailVerified(false);
+         user.setEmailVerificationToken(generateVerificationToken());
+         user.setTokenCreatedAt(LocalDateTime.now());
+         User savedUser = userRepository.save(user);
         
+         // Invia email di verifica
+         emailService.sendVerificationEmail(email, savedUser.getEmailVerificationToken(), email);
+         
         // Registra i crediti iniziali come bonus
         createTransaction(savedUser, "BONUS", 5, 5, "Crediti trial iniziali");
         return savedUser;
     }
 
+    public boolean verifyEmail(String token) {
+        Optional<User> userOpt = userRepository.findByEmailVerificationToken(token);
+        
+        if (userOpt.isEmpty()) {
+            return false; // Token non valido
+        }
+        
+        User user = userOpt.get();
+        
+        // Verifica scadenza token
+        if (isTokenExpired(user.getTokenCreatedAt())) {
+            return false; // Token scaduto
+        }
+        
+        // Verifica email e assegna crediti bonus
+        user.setEmailVerified(true);
+        user.setEmailVerificationToken(null); // Rimuovi token usato
+        user.setCredits(5); // ✅ Ora assegna i crediti trial
+        userRepository.save(user);
+        
+        // Registra i crediti iniziali come bonus
+        createTransaction(user, "BONUS", 5, 5, "Crediti trial iniziali - Email verificata");
+        
+        return true;
+    }
+    
+    public boolean resendVerificationEmail(String email) {
+        Optional<User> userOpt = userRepository.findByEmail(email);
+        
+        if (userOpt.isEmpty() || userOpt.get().getEmailVerified()) {
+            return false; // Utente non trovato o già verificato
+        }
+        
+        User user = userOpt.get();
+        
+        // Genera nuovo token
+        user.setEmailVerificationToken(generateVerificationToken());
+        user.setTokenCreatedAt(LocalDateTime.now());
+        userRepository.save(user);
+        
+        // Invia nuova email
+        emailService.sendVerificationEmail(email, user.getEmailVerificationToken(), email);
+        
+        return true;
+    }
+    
+    private String generateVerificationToken() {
+        return UUID.randomUUID().toString();
+    }
+    
+    private boolean isTokenExpired(LocalDateTime tokenCreatedAt) {
+        return tokenCreatedAt.plusHours(TOKEN_EXPIRATION_HOURS).isBefore(LocalDateTime.now());
+    }
+    
     public Optional<User> findByEmail(String email) {
         return userRepository.findByEmailWithAllFields(email);
     }
@@ -59,6 +125,9 @@ this.passwordEncoder = passwordEncoder;
     
  // ✅ NUOVO: Metodo robusto per usare crediti
     public boolean useCredit(User user, String operationType) {
+    	  if (!user.getEmailVerified()) {
+              throw new IllegalStateException("Email non verificata");
+          }
         if (user.getCredits() == null || user.getCredits() <= 0) {
             return false;
         }
