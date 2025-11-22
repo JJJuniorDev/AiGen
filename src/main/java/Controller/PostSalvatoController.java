@@ -2,7 +2,9 @@ package Controller;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import DTO.PostSalvatoDTO;
@@ -75,9 +77,21 @@ public class PostSalvatoController {
  }
  
  @DeleteMapping("/{id}")
- public ResponseEntity<?> eliminaPostSalvato(@PathVariable Long id,
-                                           @AuthenticationPrincipal User user) {
-     boolean eliminato = postSalvatoService.eliminaPostSalvato(id, user.getId());
+ public ResponseEntity<?> eliminaPostSalvato(@PathVariable Long id) {
+	  Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+	    System.out.println("Authentication: " + authentication);
+	    System.out.println("Principal: " + authentication.getPrincipal());
+	    
+	    if (authentication == null || !authentication.isAuthenticated()) {
+	        return ResponseEntity.status(401).build();
+	    }
+	    UserDTO userDTO = (UserDTO) authentication.getPrincipal();
+	    System.out.println("User from SecurityContext: " + userDTO);
+	    
+	    if (userDTO == null) {
+	        return ResponseEntity.status(401).body("Utente non autenticato");
+	    }
+     boolean eliminato = postSalvatoService.eliminaPostSalvato(id, Long.parseLong(userDTO.getId()));
      if (eliminato) {
          return ResponseEntity.ok().build();
      } else {

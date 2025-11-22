@@ -11,6 +11,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
@@ -25,6 +26,7 @@ public class PostSalvato {
     @JoinColumn(name = "user_id")
     private User user;
     
+    @Column(columnDefinition = "TEXT")
     private String contenuto;
     private String tipo; // "short_quote", "cta", "social_post", "headline"
     private String piattaforma; // "instagram", "facebook", etc.
