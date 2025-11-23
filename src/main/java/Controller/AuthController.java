@@ -112,9 +112,16 @@ public class AuthController {
                 <head>
                     <meta charset="UTF-8">
                     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                    <title>Email Verificata - AI Social Generator</title>
+                    <title>Email Verificata - AI SocialCraft Generator</title>
                     <meta http-equiv="refresh" content="3;url=https://ai-gen-fe.vercel.app">
                     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+                     <script>
+                   
+                    localStorage.setItem('emailJustVerified', 'true');
+                    localStorage.setItem('pendingEmailLogin', 'true');
+                    
+                    window.location.href = 'https://ai-gen-fe.vercel.app';
+                </script>
                     <style>
                         * {
                             margin: 0;
