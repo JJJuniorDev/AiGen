@@ -40,7 +40,7 @@ public class CreditPackage {
     @Column(nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
-  
+   
     // Costruttori
     public CreditPackage() {}
 
@@ -135,5 +135,4 @@ public class CreditPackage {
 	}
 
 
-    
 }

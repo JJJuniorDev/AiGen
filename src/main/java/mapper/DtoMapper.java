@@ -16,6 +16,7 @@ public class DtoMapper {
         dto.setBrandLogoUrl(user.getBrandLogoUrl());
         dto.setPrimaryColor(user.getPrimaryColor());
         dto.setEmailVerified(user.getEmailVerified());
+        dto.setMaxBrands(user.getMaxBrands());
         return dto;
     }
 

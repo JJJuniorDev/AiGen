@@ -36,8 +36,16 @@ public class BrandProfileService {
     }
 
     public BrandProfile createForUser(BrandProfileDTO dto, Long userId) {
-        User user = new User();
-        user.setId(userId);
+    	User user = new User();
+        user.setId(userId); 
+    	long currentBrandsCount = brandRepository.countByUser(user);
+           if (currentBrandsCount >= user.getMaxBrands()) {
+               throw new RuntimeException(
+                   "Limite brand raggiunto! Hai " + currentBrandsCount + 
+                   " brand su " + user.getMaxBrands() + " disponibili."
+               );
+           }
+    	
 
         BrandProfile profile = new BrandProfile();
         profile.setUser(user);

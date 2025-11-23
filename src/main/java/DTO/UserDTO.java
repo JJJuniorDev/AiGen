@@ -8,6 +8,7 @@ public class UserDTO {
     private String brandLogoUrl;
     private String primaryColor;
     private Boolean emailVerified;
+    private Integer maxBrands;
 	public String getId() {
 		return id;
 	}
@@ -49,6 +50,12 @@ public class UserDTO {
 	}
 	public void setEmailVerified(Boolean emailVerified) {
 		this.emailVerified = emailVerified;
+	}
+	public Integer getMaxBrands() {
+		return maxBrands;
+	}
+	public void setMaxBrands(Integer maxBrands) {
+		this.maxBrands = maxBrands;
 	}
 
 

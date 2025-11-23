@@ -11,4 +11,5 @@ import model.User;
 public interface BrandProfileRepository extends JpaRepository<BrandProfile, Long>{
 List<BrandProfile> findByUser(User user);
 Optional<BrandProfile> findByIdAndUser(Long id, User user);
+long countByUser(User user);
 }
