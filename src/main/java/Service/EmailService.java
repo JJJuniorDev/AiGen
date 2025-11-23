@@ -1,5 +1,7 @@
 package Service;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
@@ -18,9 +20,17 @@ public class EmailService {
     @Value("${app.environment:development}")
     private String environment;
     
+    private static final Logger logger = LoggerFactory.getLogger(EmailService.class);
+    
+    
     public void sendVerificationEmail(String toEmail, String token, String userEmail) {
        
             String verificationUrl = baseUrl + "/api/auth/verify-email?token=" + token;
+            
+            logger.info("📧 Attempting to send verification email to: {}", toEmail);
+            logger.info("🔗 Verification URL: {}", verificationUrl);
+            logger.info("🌍 Environment: {}", environment);
+            logger.info("📍 Base URL: {}", baseUrl);
             
             // In sviluppo, logga il link invece di inviare email
             if ("development".equals(environment)) {
@@ -35,7 +45,9 @@ public class EmailService {
             message.setText(createEmailText(userEmail, verificationUrl));
                 
             mailSender.send(message);
+            logger.info("✅ Email inviata con successo a: {}", toEmail);
         } catch (Exception e) {
+        	 logger.error("❌ Errore critico nell'invio email a {}: {}", toEmail, e.getMessage(), e);
         	System.err.println("❌ Errore nell'invio email a " + toEmail + ": " + e.getMessage());
             throw new RuntimeException("Errore nell'invio dell'email di verifica", e);
         }
