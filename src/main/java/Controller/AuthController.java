@@ -1,10 +1,12 @@
 package Controller;
 
+import java.net.URI;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -47,19 +49,60 @@ public class AuthController {
     }
     
     @GetMapping("/verify-email")
-    public  ResponseEntity<Map<String, Object>>  verifyEmail(@RequestParam String token) {
+    public  ResponseEntity<String>  verifyEmail(@RequestParam String token) {
         boolean verified = userService.verifyEmail(token);
         Map<String, Object> response = new HashMap<>();
+        String htmlResponse;
         if (verified) {
-            response.put("success", true);
-            response.put("message", "Email verificata con successo");
-            return ResponseEntity.ok(response);
-        } else {
-            response.put("success", false);
-            response.put("message", "Link di verifica non valido o scaduto");
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-        }
-    }
+            htmlResponse = """
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Email Verificata</title>
+                    <meta http-equiv="refresh" content="3;url=https://tua-app.com/dashboard">
+                    <style>
+                        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+                        .success { color: green; }
+                    </style>
+                </head>
+                <body>
+                    <div class="success">
+                        <h1>✅ Email verificata con successo!</h1>
+                        <p>Stai per essere reindirizzato all'applicazione...</p>
+                        <p><a href="https://https://ai-gen-fe.vercel.app/">Clicca qui se il reindirizzamento non funziona</a></p>
+                    </div>
+                </body>
+                </html>
+                """;
+        } 
+        else {
+        	 htmlResponse = """
+        	            <!DOCTYPE html>
+        	            <html>
+        	            <head>
+        	                <title>Errore Verifica</title>
+        	                <meta http-equiv="refresh" content="5;url=https://tua-app.com/login">
+        	                <style>
+        	                    body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+        	                    .error { color: red; }
+        	                </style>
+        	            </head>
+        	            <body>
+        	                <div class="error">
+        	                    <h1>❌ Link di verifica non valido</h1>
+        	                    <p>Stai per essere reindirizzato alla pagina di login...</p>
+        	                    <p><a href="https://tua-app.com/login">Clicca qui per accedere</a></p>
+        	                </div>
+        	            </body>
+        	            </html>
+        	            """;
+        	    }
+        	    
+        	    return ResponseEntity.ok()
+        	            .contentType(MediaType.TEXT_HTML)
+        	            .body(htmlResponse);
+        	}
+
     
     @PostMapping("/resend-verification")
     public ResponseEntity<String> resendVerification(@RequestBody Map<String, String> request) {
