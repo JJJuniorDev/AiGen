@@ -74,7 +74,7 @@ this.passwordEncoder = passwordEncoder;
         // Verifica email e assegna crediti bonus
         user.setEmailVerified(true);
         user.setEmailVerificationToken(null); // Rimuovi token usato
-        user.setCredits(5); // ✅ Ora assegna i crediti trial
+        user.setCredits(20); // ✅ Ora assegna i crediti trial
         userRepository.save(user);
         
         // Registra i crediti iniziali come bonus
