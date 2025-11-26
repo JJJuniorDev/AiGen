@@ -238,209 +238,196 @@ public class LLMService {
     private String buildItalianPrompt(String inputText, String platform, String postType,
             int emotion, int creativity, int formality, int urgency, LengthConfig lengthConfig, 
             BrandProfile brandProfile, String platformGuidelines, int attempt) {
-    	return """
-            **SEI UN ESPERTO COPYWRITER PER MULTI-PIATTAFORMA - CREA CONTENUTI OTTIMIZZATI**
-            
-            ⚠️ **REGOLA FONDAMENTALE: RISPETTA LA LUNGHEZZA E IL FORMATO DELLA PIATTAFORMA**
-            - LUNGHEZZA TARGET: %d caratteri (±15%%)
-            - PIATTAFORMA: %s
-            - %s
-            
-            **CONTESTO BRAND:**
-            %s
-            
-            **TEMA DA SVILUPPARE:**
-            "%s"
-            
-            🚫 **PROIBIZIONI ASSOLUTE:**
-            - MAI usare prima persona ("io", "mi", "mio")
-            - MAI generare testimonianze o recensioni
-            - MAI creare contenuti troppo corti (<%d caratteri)
-            - MAI usare linguaggio corporate generico
-            
-            ✅ **STRATEGIE PER CONTENUTI LUNGHI E QUALITATIVI:**
-            
-            1. **APPROCCIO STORYTELLING**
-               - Racconta una trasformazione o un caso
-               - Inizia con situazione "prima/dopo"
-               - Includi dettagli specifici e concreti
-            
-            2. **APPROCCIO DATI E RISULTATI**  
-               - Presenta statistiche sorprendenti
-               - Mostra benefici misurabili
-               - Includi metriche e KPI
-            
-            3. **APPROCCIO PROBLEMA-SOLUZIONE**
-               - Identifica un pain point specifico
-               - Presenta soluzione strutturata
-               - Concludi con call-to-action chiara
-            
-            🔥 **ESEMPI DI CONTENUTI LUNGHI E VINCENTI:**
-            
-            ESEMPIO 1 (400+ caratteri):
-            "Le aziende che investono in formazione digitale vedono un +45%% di produttività nei team. 
-            Abbiamo aiutato 150+ organizzazioni a trasformare le competenze con programmi personalizzati. 
-            I risultati? Riduzione del 60%% degli errori e aumento del 30%% della soddisfazione dei dipendenti.
-            Qual è la skill più critica che la tua azienda sta sviluppando quest'anno?"
-            
-            ESEMPIO 2 (350+ caratteri):
-            "Il 67%% dei progetti digitali fallisce per mancanza di una strategia chiara. 
-            La nostra metodologia garantisce successo attraverso: fasi definite, metriche chiare, 
-            e continuous improvement. I clienti hanno raggiunto ROI del 200%% in 12 mesi.
-            Come misuri il successo dei tuoi progetti digitali?"
-            
-            📊 **PARAMETRI CREATIVI:**
-            - Emozione: %d/100 (%s)
-            - Creatività: %d/100 (%s)  
-            - Formalità: %d/100 (%s)
-            - Urgenza: %d/100 (%s)
-            
-            🎯 **RICHIESTA FINALE:**
-            GENERA 3 VERSIONI COMPLETE, OGNUNA DI ALMENO %d CARATTERI, 
-            ADATTATE ALLA PIATTAFORMA %s E AL TONO DEL BRAND.
-            
-            FORMATO OUTPUT JSON:
-            {
-              "socialPostVersions": [
-                "Testo completo versione 1 con struttura dettagliata...",
-                "Testo completo versione 2 con approccio diverso...", 
-                "Testo completo versione 3 approfondito e coinvolgente..."
-              ],
-              "headlineVersions": [
-                "Headline intrigante 1",
-                "Headline intrigante 2", 
-                "Headline intrigante 3"
-              ],
-              "shortQuoteVersions": [
-                "Frase memorabile 1",
-                "Frase memorabile 2",
-                "Frase memorabile 3"
-              ],
-              "callToActionVersions": [
-                "CTA specifica 1 →",
-                "CTA specifica 2 →", 
-                "CTA specifica 3 →"
-              ]
-            }
-            """.formatted(
-                lengthConfig.getSocialPostLength(),
-                platform.toUpperCase(),
-                platformGuidelines,
-                buildCompactBrandContext(brandProfile, "it"),
-                inputText.length() > 350 ? inputText.substring(0, 350) + "..." : inputText,
-                (int)(lengthConfig.getSocialPostLength() * 0.7), // Minimo 70% del target
-                emotion, getCompactEmotionDesc(emotion, "it"),
-                creativity, getCompactCreativityDesc(creativity, "it"), 
-                formality, getCompactFormalityDesc(formality, "it"),
-                urgency, getCompactUrgencyDesc(urgency, "it"),
-                (int)(lengthConfig.getSocialPostLength() * 0.8), // Enfatizza lunghezza minima
-                platform.toUpperCase()
-            );
-    }
+    	  return """
+    		        **SEI UN ESPERTO COPYWRITER PER CONTENUTI BUSINESS PROFESSIONALI**
+    		        
+    		        🎯 **OBIETTIVO**: Creare contenuti autentici, credibili e utili per il target.
+    		        
+    		        🚫 **PROIBIZIONI ASSOLUTE - MAI VIOLARE**:
+    		        1. ❌ MAI inventare statistiche, percentuali o dati numerici
+    		        2. ❌ MAI usare testimonianze clienti o esperienze specifiche
+    		        3. ❌ MAI fare claim medici, salutistici o risultati garantiti
+    		        4. ❌ MAI usare linguaggio da vendita aggressiva
+    		        
+    		        ✅ **APPROCCI OBBLIGATORI**:
+    		        
+    		        **APPROCCIO 1: VALORE EDUCATIVO**
+    		        - Spiega benefici in modo generale e oggettivo
+    		        - Condividi conoscenze e best practices
+    		        - Offri consigli pratici e insights
+    		        - Focalizzati sul valore per il cliente
+    		        
+    		        **APPROCCIO 2: STORYTELLING AZIENDALE**
+    		        - Racconta la filosofia e i valori del brand
+    		        - Spiega l'approccio e la metodologia
+    		        - Condividi la visione e la missione
+    		        - Evidenzia l'esperienza e l'expertise
+    		        
+    		        **APPROCCIO 3: GUIDA PRATICA**  
+    		        - Offri soluzioni a problemi comuni
+    		        - Condividi framework e metodologie
+    		        - Crea contenuti how-to e tutorial
+    		        - Fornisce actionable insights
+    		        
+    		        📋 **CONTESTO BRAND**:
+    		        %s
+    		        
+    		        🎨 **TEMA DA SVILUPPARE**:
+    		        "%s"
+    		        
+    		        🔥 **ESEMPI CORRETTI - SEGUI QUESTI FORMATI**:
+    		        
+    		        ESEMPIO 1 (Yoga Aziendale):
+    		        "La pratica regolare dello yoga in ambito aziendale può contribuire a migliorare il benessere psico-fisico dei collaboratori. Attraverso sessioni mirate di respirazione e movimento, è possibile favorire la concentrazione e ridurre lo stress accumulato durante la giornata lavorativa. Quali strategie adotti nella tua organizzazione per supportare l'equilibrio lavoro-vita privata?"
+    		        
+    		        ESEMPIO 2 (Consulenza Strategica):
+    		        "Definire una strategia chiara è fondamentale per il successo di qualsiasi progetto imprenditoriale. Un approccio strutturato che includa obiettivi misurabili, analisi competitive e piano d'azione dettagliato può fare la differenza nel raggiungimento dei risultati attesi. Come affronti attualmente la pianificazione strategica nella tua attività?"
+    		        
+    		        ESEMPIO 3 (Prodotti Pet Food):
+    		        "La scelta degli ingredienti nella formulazione di alimenti per animali domestici riveste un'importanza cruciale per il loro benessere a lungo termine. Privilegiare componenti di alta qualità e bilanciati dal punto di vista nutrizionale rappresenta un aspetto fondamentale della cura responsabile. Quali criteri consideri prioritari nella selezione dell'alimentazione per il tuo animale?"
+    		        
+    		        📊 **PARAMETRI CREATIVI**:
+    		        - Emozione: %d/100 (%s)
+    		        - Creatività: %d/100 (%s)
+    		        - Formalità: %d/100 (%s)
+    		        - Urgenza: %d/100 (%s)
+    		        
+    		        🎯 **RICHIESTA FINALE**:
+    		        GENERA 3 VERSIONI COMPLETE E DIVERSE, OGNUNA DI %d-%d CARATTERI.
+    		        USA APPROCCI DIVERSI PER OGNI VERSIONE E MANTIENI UN TONO PROFESSIONALE E CREDIBILE.
+    		        
+    		        FORMATO OUTPUT JSON:
+    		        {
+    		          "socialPostVersions": [
+    		            "Testo versione 1 - Approccio educativo...",
+    		            "Testo versione 2 - Approccio storytelling...",
+    		            "Testo versione 3 - Approccio guida pratica..."
+    		          ],
+    		          "headlineVersions": [
+    		            "Headline 1",
+    		            "Headline 2", 
+    		            "Headline 3"
+    		          ],
+    		          "shortQuoteVersions": [
+    		            "Frase memorabile 1",
+    		            "Frase memorabile 2",
+    		            "Frase memorabile 3"
+    		          ],
+    		          "callToActionVersions": [
+    		            "CTA 1 →",
+    		            "CTA 2 →",
+    		            "CTA 3 →"
+    		          ]
+    		        }
+    		        """.formatted(
+    		            buildCompactBrandContext(brandProfile, "it"),  // %s - CONTESTO BRAND
+    		            inputText.length() > 300 ? inputText.substring(0, 300) + "..." : inputText,  // %s - TEMA
+    		            emotion, getCompactEmotionDesc(emotion, "it"),  // %d, %s - EMOZIONE
+    		            creativity, getCompactCreativityDesc(creativity, "it"),  // %d, %s - CREATIVITÀ
+    		            formality, getCompactFormalityDesc(formality, "it"),  // %d, %s - FORMALITÀ
+    		            urgency, getCompactUrgencyDesc(urgency, "it"),  // %d, %s - URGENZA
+    		            (int)(lengthConfig.getSocialPostLength() * 0.8),  // %d - LUNGHEZZA MINIMA
+    		            (int)(lengthConfig.getSocialPostLength() * 1.2)   // %d - LUNGHEZZA MASSIMA
+    		        );
+    		}
     
     private String buildEnglishPrompt(String inputText, String platform, String postType,
             int emotion, int creativity, int formality, int urgency, LengthConfig lengthConfig, 
             BrandProfile brandProfile, String platformGuidelines, int attempt) {
         
-        return """
-            **YOU ARE AN EXPERT MULTI-PLATFORM COPYWRITER - CREATE OPTIMIZED CONTENT**
-            
-            ⚠️ **FUNDAMENTAL RULE: RESPECT PLATFORM LENGTH AND FORMAT**
-            - TARGET LENGTH: %d characters (±15%%)
-            - PLATFORM: %s
-            - %s
-            
-            **BRAND CONTEXT:**
-            %s
-            
-            **THEME TO DEVELOP:**
-            "%s"
-            
-            🚫 **ABSOLUTE PROHIBITIONS:**
-            - NEVER use first person ("I", "me", "my")
-            - NEVER generate testimonials or reviews  
-            - NEVER create content that's too short (<%d characters)
-            - NEVER use generic corporate language
-            
-            ✅ **STRATEGIES FOR LONG, QUALITY CONTENT:**
-            
-            1. **STORYTELLING APPROACH**
-               - Tell a transformation story or case study
-               - Start with "before/after" situation
-               - Include specific, concrete details
-            
-            2. **DATA & RESULTS APPROACH**  
-               - Present surprising statistics
-               - Show measurable benefits
-               - Include metrics and KPIs
-            
-            3. **PROBLEM-SOLUTION APPROACH**
-               - Identify a specific pain point
-               - Present structured solution
-               - Conclude with clear call-to-action
-            
-            🔥 **EXAMPLES OF LONG, WINNING CONTENT:**
-            
-            EXAMPLE 1 (400+ characters):
-            "Companies investing in digital training see +45%% team productivity. 
-            We've helped 150+ organizations transform skills with personalized programs. 
-            Results? 60%% error reduction and 30%% increase in employee satisfaction.
-            What's the most critical skill your company is developing this year?"
-            
-            EXAMPLE 2 (350+ characters):
-            "67%% of digital projects fail due to lack of clear strategy. 
-            Our methodology ensures success through: defined phases, clear metrics, 
-            and continuous improvement. Clients achieved 200%% ROI in 12 months.
-            How do you measure the success of your digital projects?"
-            
-            📊 **CREATIVE PARAMETERS:**
-            - Emotion: %d/100 (%s)
-            - Creativity: %d/100 (%s)  
-            - Formality: %d/100 (%s)
-            - Urgency: %d/100 (%s)
-            
-            🎯 **FINAL REQUEST:**
-            GENERATE 3 COMPLETE VERSIONS, EACH AT LEAST %d CHARACTERS, 
-            ADAPTED TO %s PLATFORM AND BRAND TONE.
-            
-            JSON OUTPUT FORMAT:
-            {
-              "socialPostVersions": [
-                "Complete text version 1 with detailed structure...",
-                "Complete text version 2 with different approach...", 
-                "Complete text version 3 in-depth and engaging..."
-              ],
-              "headlineVersions": [
-                "Intriguing headline 1",
-                "Intriguing headline 2", 
-                "Intriguing headline 3"
-              ],
-              "shortQuoteVersions": [
-                "Memorable quote 1",
-                "Memorable quote 2",
-                "Memorable quote 3"
-              ],
-              "callToActionVersions": [
-                "Specific CTA 1 →",
-                "Specific CTA 2 →", 
-                "Specific CTA 3 →"
-              ]
-            }
-            """.formatted(
-                lengthConfig.getSocialPostLength(),
-                platform.toUpperCase(),
-                platformGuidelines,
-                buildCompactBrandContext(brandProfile, "en"),
-                inputText.length() > 350 ? inputText.substring(0, 350) + "..." : inputText,
-                (int)(lengthConfig.getSocialPostLength() * 0.7),
-                emotion, getCompactEmotionDesc(emotion, "en"),
-                creativity, getCompactCreativityDesc(creativity, "en"), 
-                formality, getCompactFormalityDesc(formality, "en"),
-                urgency, getCompactUrgencyDesc(urgency, "en"),
-                (int)(lengthConfig.getSocialPostLength() * 0.8),
-                platform.toUpperCase()
-            );
-    }
+    	return """
+    	        **YOU ARE AN EXPERT BUSINESS COPYWRITER FOR PROFESSIONAL CONTENT**
+    	        
+    	        🎯 **OBJECTIVE**: Create authentic, credible, and useful content for the target audience.
+    	        
+    	        🚫 **ABSOLUTE PROHIBITIONS - NEVER VIOLATE**:
+    	        1. ❌ NEVER invent statistics, percentages, or numerical data
+    	        2. ❌ NEVER use customer testimonials or specific experiences
+    	        3. ❌ NEVER use first-person plural ("we", "our", "us")
+    	        4. ❌ NEVER make medical, health, or guaranteed results claims
+    	        5. ❌ NEVER use aggressive sales language
+    	        
+    	        ✅ **MANDATORY APPROACHES**:
+    	        
+    	        **APPROACH 1: EDUCATIONAL VALUE**
+    	        - Explain benefits in general and objective terms
+    	        - Share knowledge and best practices
+    	        - Offer practical advice and insights
+    	        - Focus on customer value
+    	        
+    	        **APPROACH 2: BRAND STORYTELLING**
+    	        - Share the brand's philosophy and values
+    	        - Explain the approach and methodology
+    	        - Communicate vision and mission
+    	        - Highlight experience and expertise
+    	        
+    	        **APPROACH 3: PRACTICAL GUIDE**
+    	        - Offer solutions to common problems
+    	        - Share frameworks and methodologies
+    	        - Create how-to content and tutorials
+    	        - Provide actionable insights
+    	        
+    	        📋 **BRAND CONTEXT**:
+    	        %s
+    	        
+    	        🎨 **THEME TO DEVELOP**:
+    	        "%s"
+    	        
+    	        🔥 **CORRECT EXAMPLES - FOLLOW THESE FORMATS**:
+    	        
+    	        EXAMPLE 1 (Corporate Yoga):
+    	        "Regular yoga practice in corporate settings can contribute to improved employee well-being. Through targeted breathing and movement sessions, it's possible to enhance concentration and reduce accumulated work-related stress. What strategies does your organization implement to support work-life balance?"
+    	        
+    	        EXAMPLE 2 (Strategic Consulting):
+    	        "Defining a clear strategy is essential for any business project's success. A structured approach including measurable objectives, competitive analysis, and detailed action plans can make a significant difference in achieving expected outcomes. How do you currently approach strategic planning in your business?"
+    	        
+    	        EXAMPLE 3 (Pet Food Products):
+    	        "Ingredient selection in pet food formulation plays a crucial role in long-term animal well-being. Prioritizing high-quality, nutritionally balanced components represents a fundamental aspect of responsible pet care. What criteria do you consider most important when selecting nutrition for your pet?"
+    	        
+    	        📊 **CREATIVE PARAMETERS**:
+    	        - Emotion: %d/100 (%s)
+    	        - Creativity: %d/100 (%s)
+    	        - Formality: %d/100 (%s)
+    	        - Urgency: %d/100 (%s)
+    	        
+    	        🎯 **FINAL REQUEST**:
+    	        GENERATE 3 COMPLETE AND DISTINCT VERSIONS, EACH %d-%d CHARACTERS.
+    	        USE DIFFERENT APPROACHES FOR EACH VERSION AND MAINTAIN A PROFESSIONAL, CREDIBLE TONE.
+    	        
+    	        JSON OUTPUT FORMAT:
+    	        {
+    	          "socialPostVersions": [
+    	            "Text version 1 - Educational approach...",
+    	            "Text version 2 - Storytelling approach...",
+    	            "Text version 3 - Practical guide approach..."
+    	          ],
+    	          "headlineVersions": [
+    	            "Headline 1",
+    	            "Headline 2",
+    	            "Headline 3"
+    	          ],
+    	          "shortQuoteVersions": [
+    	            "Memorable quote 1",
+    	            "Memorable quote 2", 
+    	            "Memorable quote 3"
+    	          ],
+    	          "callToActionVersions": [
+    	            "CTA 1 →",
+    	            "CTA 2 →",
+    	            "CTA 3 →"
+    	          ]
+    	        }
+    	        """.formatted(
+    	            buildCompactBrandContext(brandProfile, "en"),  // %s - BRAND CONTEXT
+    	            inputText.length() > 300 ? inputText.substring(0, 300) + "..." : inputText,  // %s - THEME
+    	            emotion, getCompactEmotionDesc(emotion, "en"),  // %d, %s - EMOTION
+    	            creativity, getCompactCreativityDesc(creativity, "en"),  // %d, %s - CREATIVITY
+    	            formality, getCompactFormalityDesc(formality, "en"),  // %d, %s - FORMALITY
+    	            urgency, getCompactUrgencyDesc(urgency, "en"),  // %d, %s - URGENCY
+    	            (int)(lengthConfig.getSocialPostLength() * 0.8),  // %d - MIN LENGTH
+    	            (int)(lengthConfig.getSocialPostLength() * 1.2)   // %d - MAX LENGTH
+    	        );
+    	}
 
     private String getPlatformSpecificGuidelines(String platform, LengthConfig config, String language) {
         if ("it".equals(language)) {
@@ -629,7 +616,7 @@ public class LLMService {
         headers.setBearerAuth(groqApiKey);
 
         Map<String, Object> body = Map.of(
-            "model", "llama-3.1-8b-instant",
+            "model", "llama-3.3-70b-versatile",
             "messages", new Object[]{
                 Map.of("role", "system", "content", buildCompactSystemPrompt()),
                 Map.of("role", "user", "content", prompt)
