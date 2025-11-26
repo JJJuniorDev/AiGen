@@ -23,7 +23,7 @@ public class TestimonialDTO {
     private int length;
     private String brandProfileId;
     private List<String> callToActionVersions;
-    
+    private String language;
     
 	public String getId() {
 		return id;
@@ -138,4 +138,12 @@ public class TestimonialDTO {
     public void setCallToActionVersions(List<String> callToActionVersions) {
         this.callToActionVersions = callToActionVersions;
     }
+	public String getLanguage() {
+		return language;
+	}
+	public void setLanguage(String language) {
+		this.language = language;
+	}
+    
+    
 }

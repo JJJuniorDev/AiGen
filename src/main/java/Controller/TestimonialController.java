@@ -81,16 +81,18 @@ public class TestimonialController {
         }
         try {
         // mock LLM call
-        TestimonialDTO gen = llmService.generate(
-        		req.getInputText(),
-        		req.getPlatform(), 
-        		req.getSelectedPostType(),
-        		req.getEmotion(),
-        		req.getCreativity(),
-        		req.getFormality(),
-        		req.getUrgency(),
-        		req.getLength(),
-        		brandProfile);
+        	TestimonialDTO gen = llmService.generate(
+        		    req.getInputText(),
+        		    req.getPlatform(), 
+        		    req.getSelectedPostType(),
+        		    req.getEmotion(),
+        		    req.getCreativity(),
+        		    req.getFormality(),
+        		    req.getUrgency(),
+        		    req.getLength(),
+        		    brandProfile,     
+        		    req.getLanguage()  
+        		);
         
         Testimonial t = new Testimonial();
         t.setUser(user);
@@ -100,7 +102,7 @@ public class TestimonialController {
         t.setShortQuoteVersions(gen.getShortQuoteVersions());
         t.setCallToActionVersions(gen.getCallToActionVersions());
         t.setCreatedAt(LocalDateTime.now());
-
+        t.setLanguage(req.getLanguage());
         Testimonial saved = testimonialService.save(t);
 
 

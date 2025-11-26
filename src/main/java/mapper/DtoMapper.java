@@ -32,6 +32,7 @@ public class DtoMapper {
         dto.setExportedMd(t.isExportedMd());
         dto.setExportedPng(t.isExportedPng());
         dto.setCreatedAt(t.getCreatedAt());
+        dto.setLanguage(t.getLanguage());
         return dto;
     }
 }

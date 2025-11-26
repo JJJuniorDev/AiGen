@@ -61,7 +61,7 @@ public class LLMService {
     }
 
     public TestimonialDTO generate(String inputText, String platform, String postType,
-            int emotion, int creativity, int formality, int urgency, int length, BrandProfile brandProfile) {
+            int emotion, int creativity, int formality, int urgency, int length, BrandProfile brandProfile, String language) {
         
         if (!canProcessRequest(4000)) {
             throw new RuntimeException("Servizio occupato. Riprova tra qualche secondo.");
@@ -76,7 +76,7 @@ public class LLMService {
             
             // 🎯 GENERAZIONE CON MIGLIOR QUALITÀ
             String bestContent = generateBestQualityContent(inputText, platform, postType, 
-                emotion, creativity, formality, urgency, lengthConfig, brandProfile, restTemplate);
+                emotion, creativity, formality, urgency, lengthConfig, brandProfile, restTemplate, language);
             
             recordTokenUsage(4000);
             
@@ -95,7 +95,7 @@ public class LLMService {
     // 🎯 METODO PRINCIPALE PER QUALITÀ OTTIMALE
     private String generateBestQualityContent(String inputText, String platform, String postType,
             int emotion, int creativity, int formality, int urgency, LengthConfig lengthConfig, 
-            BrandProfile brandProfile, RestTemplate restTemplate) {
+            BrandProfile brandProfile, RestTemplate restTemplate, String language) {
         
         int maxAttempts = 3;
         String bestContent = null;
@@ -106,7 +106,7 @@ public class LLMService {
             
             try {
                 String content = generateQualityContent(inputText, platform, postType, 
-                    emotion, creativity, formality, urgency, lengthConfig, brandProfile, restTemplate, attempt);
+                    emotion, creativity, formality, urgency, lengthConfig, brandProfile, restTemplate, attempt, language);
                 
                 if (content == null) {
                     System.err.println("⚠️ Tentativo " + attempt + " fallito: contenuto nullo");
@@ -219,11 +219,26 @@ public class LLMService {
     // 🎯 GENERAZIONE CONTENUTO DI QUALITÀ - COMPLETAMENTE RIVISTA
     private String generateQualityContent(String inputText, String platform, String postType,
             int emotion, int creativity, int formality, int urgency, LengthConfig lengthConfig, 
-            BrandProfile brandProfile, RestTemplate restTemplate, int attempt) {
+            BrandProfile brandProfile, RestTemplate restTemplate, int attempt, String language) {
         
-        String platformGuidelines = getPlatformSpecificGuidelines(platform, lengthConfig);
+        String platformGuidelines = getPlatformSpecificGuidelines(platform, lengthConfig, language);
         
-        String prompt = """
+        String prompt = "it".equals(language) ? 
+                buildItalianPrompt(inputText, platform, postType, emotion, creativity, formality, 
+                                 urgency, lengthConfig, brandProfile, platformGuidelines, attempt) :
+                buildEnglishPrompt(inputText, platform, postType, emotion, creativity, formality, 
+                                 urgency, lengthConfig, brandProfile, platformGuidelines, attempt);
+        
+   
+        
+        return callGroqAPI(prompt, restTemplate, 
+        	    "Generazione " + platform + " " + language.toUpperCase() + " (tentativo " + attempt + ")", 2500);
+    }
+    
+    private String buildItalianPrompt(String inputText, String platform, String postType,
+            int emotion, int creativity, int formality, int urgency, LengthConfig lengthConfig, 
+            BrandProfile brandProfile, String platformGuidelines, int attempt) {
+    	return """
             **SEI UN ESPERTO COPYWRITER PER MULTI-PIATTAFORMA - CREA CONTENUTI OTTIMIZZATI**
             
             ⚠️ **REGOLA FONDAMENTALE: RISPETTA LA LUNGHEZZA E IL FORMATO DELLA PIATTAFORMA**
@@ -311,36 +326,140 @@ public class LLMService {
                 lengthConfig.getSocialPostLength(),
                 platform.toUpperCase(),
                 platformGuidelines,
-                buildCompactBrandContext(brandProfile),
+                buildCompactBrandContext(brandProfile, "it"),
                 inputText.length() > 350 ? inputText.substring(0, 350) + "..." : inputText,
                 (int)(lengthConfig.getSocialPostLength() * 0.7), // Minimo 70% del target
-                emotion, getCompactEmotionDesc(emotion),
-                creativity, getCompactCreativityDesc(creativity), 
-                formality, getCompactFormalityDesc(formality),
-                urgency, getCompactUrgencyDesc(urgency),
+                emotion, getCompactEmotionDesc(emotion, "it"),
+                creativity, getCompactCreativityDesc(creativity, "it"), 
+                formality, getCompactFormalityDesc(formality, "it"),
+                urgency, getCompactUrgencyDesc(urgency, "it"),
                 (int)(lengthConfig.getSocialPostLength() * 0.8), // Enfatizza lunghezza minima
                 platform.toUpperCase()
             );
+    }
+    
+    private String buildEnglishPrompt(String inputText, String platform, String postType,
+            int emotion, int creativity, int formality, int urgency, LengthConfig lengthConfig, 
+            BrandProfile brandProfile, String platformGuidelines, int attempt) {
         
-        return callGroqAPI(prompt, restTemplate, 
-            "Generazione " + platform + " (tentativo " + attempt + ")", 2500);
+        return """
+            **YOU ARE AN EXPERT MULTI-PLATFORM COPYWRITER - CREATE OPTIMIZED CONTENT**
+            
+            ⚠️ **FUNDAMENTAL RULE: RESPECT PLATFORM LENGTH AND FORMAT**
+            - TARGET LENGTH: %d characters (±15%%)
+            - PLATFORM: %s
+            - %s
+            
+            **BRAND CONTEXT:**
+            %s
+            
+            **THEME TO DEVELOP:**
+            "%s"
+            
+            🚫 **ABSOLUTE PROHIBITIONS:**
+            - NEVER use first person ("I", "me", "my")
+            - NEVER generate testimonials or reviews  
+            - NEVER create content that's too short (<%d characters)
+            - NEVER use generic corporate language
+            
+            ✅ **STRATEGIES FOR LONG, QUALITY CONTENT:**
+            
+            1. **STORYTELLING APPROACH**
+               - Tell a transformation story or case study
+               - Start with "before/after" situation
+               - Include specific, concrete details
+            
+            2. **DATA & RESULTS APPROACH**  
+               - Present surprising statistics
+               - Show measurable benefits
+               - Include metrics and KPIs
+            
+            3. **PROBLEM-SOLUTION APPROACH**
+               - Identify a specific pain point
+               - Present structured solution
+               - Conclude with clear call-to-action
+            
+            🔥 **EXAMPLES OF LONG, WINNING CONTENT:**
+            
+            EXAMPLE 1 (400+ characters):
+            "Companies investing in digital training see +45%% team productivity. 
+            We've helped 150+ organizations transform skills with personalized programs. 
+            Results? 60%% error reduction and 30%% increase in employee satisfaction.
+            What's the most critical skill your company is developing this year?"
+            
+            EXAMPLE 2 (350+ characters):
+            "67%% of digital projects fail due to lack of clear strategy. 
+            Our methodology ensures success through: defined phases, clear metrics, 
+            and continuous improvement. Clients achieved 200%% ROI in 12 months.
+            How do you measure the success of your digital projects?"
+            
+            📊 **CREATIVE PARAMETERS:**
+            - Emotion: %d/100 (%s)
+            - Creativity: %d/100 (%s)  
+            - Formality: %d/100 (%s)
+            - Urgency: %d/100 (%s)
+            
+            🎯 **FINAL REQUEST:**
+            GENERATE 3 COMPLETE VERSIONS, EACH AT LEAST %d CHARACTERS, 
+            ADAPTED TO %s PLATFORM AND BRAND TONE.
+            
+            JSON OUTPUT FORMAT:
+            {
+              "socialPostVersions": [
+                "Complete text version 1 with detailed structure...",
+                "Complete text version 2 with different approach...", 
+                "Complete text version 3 in-depth and engaging..."
+              ],
+              "headlineVersions": [
+                "Intriguing headline 1",
+                "Intriguing headline 2", 
+                "Intriguing headline 3"
+              ],
+              "shortQuoteVersions": [
+                "Memorable quote 1",
+                "Memorable quote 2",
+                "Memorable quote 3"
+              ],
+              "callToActionVersions": [
+                "Specific CTA 1 →",
+                "Specific CTA 2 →", 
+                "Specific CTA 3 →"
+              ]
+            }
+            """.formatted(
+                lengthConfig.getSocialPostLength(),
+                platform.toUpperCase(),
+                platformGuidelines,
+                buildCompactBrandContext(brandProfile, "en"),
+                inputText.length() > 350 ? inputText.substring(0, 350) + "..." : inputText,
+                (int)(lengthConfig.getSocialPostLength() * 0.7),
+                emotion, getCompactEmotionDesc(emotion, "en"),
+                creativity, getCompactCreativityDesc(creativity, "en"), 
+                formality, getCompactFormalityDesc(formality, "en"),
+                urgency, getCompactUrgencyDesc(urgency, "en"),
+                (int)(lengthConfig.getSocialPostLength() * 0.8),
+                platform.toUpperCase()
+            );
     }
 
-    // 🎯 GUIDELINES SPECIFICHE PER PIATTAFORMA
-    private String getPlatformSpecificGuidelines(String platform, LengthConfig config) {
-        switch (platform.toUpperCase()) {
-            case "LINKEDIN":
-                return "FORMATO: Testo strutturato con paragrafi • ENGAGEMENT: Domande professionali • HASHTAG: 3-5 tematici";
-            case "INSTAGRAM":
-                return "FORMATO: Testo più visual con emoji • ENGAGEMENT: Domande emozionali • HASHTAG: 5-10 popolari";
-            case "TWITTER":
-                return "FORMATO: Testo conciso ma approfondito • ENGAGEMENT: Domande dirette • HASHTAG: 2-3 mirati";
-            case "FACEBOOK":
-                return "FORMATO: Testo conversazionale • ENGAGEMENT: Domande community • HASHTAG: 3-5 generali";
-            default:
-                return "FORMATO: Testo bilanciato • ENGAGEMENT: Domande coinvolgenti • HASHTAG: 3-5 relevanti";
+    private String getPlatformSpecificGuidelines(String platform, LengthConfig config, String language) {
+        if ("it".equals(language)) {
+            switch (platform.toUpperCase()) {
+                case "LINKEDIN": return "FORMATO: Testo strutturato con paragrafi • ENGAGEMENT: Domande professionali • HASHTAG: 3-5 tematici";
+                case "INSTAGRAM": return "FORMATO: Testo più visual con emoji • ENGAGEMENT: Domande emozionali • HASHTAG: 5-10 popolari";
+                case "TWITTER": return "FORMATO: Testo conciso ma approfondito • ENGAGEMENT: Domande dirette • HASHTAG: 2-3 mirati";
+                default: return "FORMATO: Testo bilanciato • ENGAGEMENT: Domande coinvolgenti • HASHTAG: 3-5 relevanti";
+            }
+        } else {
+            switch (platform.toUpperCase()) {
+                case "LINKEDIN": return "FORMAT: Structured text with paragraphs • ENGAGEMENT: Professional questions • HASHTAG: 3-5 thematic";
+                case "INSTAGRAM": return "FORMAT: More visual text with emojis • ENGAGEMENT: Emotional questions • HASHTAG: 5-10 popular";
+                case "TWITTER": return "FORMAT: Concise but in-depth text • ENGAGEMENT: Direct questions • HASHTAG: 2-3 targeted";
+                default: return "FORMAT: Balanced text • ENGAGEMENT: Engaging questions • HASHTAG: 3-5 relevant";
+            }
         }
     }
+
 
     // 🏗️ CLASSE CONFIGURAZIONE LUNGHEZZA
     private static class LengthConfig {
@@ -559,70 +678,136 @@ public class LLMService {
     }
 
     // 🏗️ CONTESTO BRAND (invariato)
-    private String buildCompactBrandContext(BrandProfile brand) {
-        if (brand == null) return "Brand: Generico | Tono: Professionale | Target: Clienti generali";
-        
-        return String.format("""
-            BRAND: %s
-            DESCRIZIONE: %s
-            VALORI: %s
-            TONO: %s
-            TARGET: %s
-            KEYWORDS: %s
-            """,
-            brand.getBrandName(),
-            brand.getBrandDescription() != null ? 
-                (brand.getBrandDescription().length() > 100 ? 
-                 brand.getBrandDescription().substring(0, 100) + "..." : brand.getBrandDescription()) 
-                : "Non specificato",
-            brand.getBrandValues() != null ? 
-                (brand.getBrandValues().length() > 80 ? 
-                 brand.getBrandValues().substring(0, 80) + "..." : brand.getBrandValues()) 
-                : "Professionalità, Qualità",
-            brand.getTone() != null ? brand.getTone().toString() : "Professionale",
-            brand.getTargetAudience() != null ? 
-                (brand.getTargetAudience().length() > 60 ? 
-                 brand.getTargetAudience().substring(0, 60) + "..." : brand.getTargetAudience()) 
-                : "Clienti generali",
-            brand.getPreferredKeywords() != null ? 
-                String.join(", ", brand.getPreferredKeywords().stream()
-                    .limit(5)
-                    .toList()) 
-                : "qualità, innovazione, risultato"
-        );
+    private String buildCompactBrandContext(BrandProfile brand, String language) {
+        if (brand == null) {
+            return "it".equals(language) ? 
+                "Brand: Generico | Tono: Professionale | Target: Clienti generali" :
+                "Brand: Generic | Tone: Professional | Target: General customers";
+        }    
+        if ("it".equals(language)) {
+            return String.format("""
+                BRAND: %s
+                DESCRIZIONE: %s
+                VALORI: %s
+                TONO: %s
+                TARGET: %s
+                KEYWORDS: %s
+                """,
+                brand.getBrandName(),
+                brand.getBrandDescription() != null ? 
+                    (brand.getBrandDescription().length() > 100 ? 
+                     brand.getBrandDescription().substring(0, 100) + "..." : brand.getBrandDescription()) 
+                    : "Non specificato",
+                brand.getBrandValues() != null ? 
+                    (brand.getBrandValues().length() > 80 ? 
+                     brand.getBrandValues().substring(0, 80) + "..." : brand.getBrandValues()) 
+                    : "Professionalità, Qualità",
+                brand.getTone() != null ? brand.getTone().toString() : "Professionale",
+                brand.getTargetAudience() != null ? 
+                    (brand.getTargetAudience().length() > 60 ? 
+                     brand.getTargetAudience().substring(0, 60) + "..." : brand.getTargetAudience()) 
+                    : "Clienti generali",
+                brand.getPreferredKeywords() != null ? 
+                    String.join(", ", brand.getPreferredKeywords().stream()
+                        .limit(5)
+                        .toList()) 
+                    : "qualità, innovazione, risultato"
+            );
+        } else {
+            return String.format("""
+                BRAND: %s
+                DESCRIPTION: %s
+                VALUES: %s
+                TONE: %s
+                TARGET: %s
+                KEYWORDS: %s
+                """,
+                brand.getBrandName(),
+                brand.getBrandDescription() != null ? 
+                    (brand.getBrandDescription().length() > 100 ? 
+                     brand.getBrandDescription().substring(0, 100) + "..." : brand.getBrandDescription()) 
+                    : "Not specified",
+                brand.getBrandValues() != null ? 
+                    (brand.getBrandValues().length() > 80 ? 
+                     brand.getBrandValues().substring(0, 80) + "..." : brand.getBrandValues()) 
+                    : "Professionalism, Quality",
+                brand.getTone() != null ? brand.getTone().toString() : "Professional",
+                brand.getTargetAudience() != null ? 
+                    (brand.getTargetAudience().length() > 60 ? 
+                     brand.getTargetAudience().substring(0, 60) + "..." : brand.getTargetAudience()) 
+                    : "General customers",
+                brand.getPreferredKeywords() != null ? 
+                    String.join(", ", brand.getPreferredKeywords().stream()
+                        .limit(5)
+                        .toList()) 
+                    : "quality, innovation, results"
+            );
+        }
     }
 
     // 🎪 METODI DI SUPPORTO (invariati)
-    private String getCompactEmotionDesc(int emotion) {
-        if (emotion <= 20) return "Razionale";
-        if (emotion <= 40) return "Positivo"; 
-        if (emotion <= 60) return "Empatico";
-        if (emotion <= 80) return "Passionale";
-        return "Emozionale";
+    private String getCompactEmotionDesc(int emotion, String language) {
+    	 if ("it".equals(language)) {
+    	        if (emotion <= 20) return "Razionale";
+    	        if (emotion <= 40) return "Positivo"; 
+    	        if (emotion <= 60) return "Empatico";
+    	        if (emotion <= 80) return "Passionale";
+    	        return "Emozionale";
+    	    } else {
+    	        if (emotion <= 20) return "Rational";
+    	        if (emotion <= 40) return "Positive"; 
+    	        if (emotion <= 60) return "Empathic";
+    	        if (emotion <= 80) return "Passionate";
+    	        return "Emotional";
+    	    }
     }
 
-    private String getCompactCreativityDesc(int creativity) {
-        if (creativity <= 20) return "Strutturato";
-        if (creativity <= 40) return "Innovativo"; 
-        if (creativity <= 60) return "Creativo";
-        if (creativity <= 80) return "Innovativo+";
-        return "Estremamente creativo";
+    private String getCompactCreativityDesc(int creativity, String language) {
+    	 if ("it".equals(language)) {
+    	        if (creativity <= 20) return "Strutturato";
+    	        if (creativity <= 40) return "Innovativo"; 
+    	        if (creativity <= 60) return "Creativo";
+    	        if (creativity <= 80) return "Innovativo+";
+    	        return "Estremamente creativo";
+    	    } else {
+    	        if (creativity <= 20) return "Structured";
+    	        if (creativity <= 40) return "Innovative"; 
+    	        if (creativity <= 60) return "Creative";
+    	        if (creativity <= 80) return "Highly Innovative";
+    	        return "Extremely Creative";
+    	    }
     }
 
-    private String getCompactFormalityDesc(int formality) {
-        if (formality <= 20) return "Informale";
-        if (formality <= 40) return "Semi-informale";
-        if (formality <= 60) return "Bilanciato";
-        if (formality <= 80) return "Formale";
-        return "Molto formale";
+    private String getCompactFormalityDesc(int formality, String language) {
+    	if ("it".equals(language)) {
+            if (formality <= 20) return "Informale";
+            if (formality <= 40) return "Semi-informale";
+            if (formality <= 60) return "Bilanciato";
+            if (formality <= 80) return "Formale";
+            return "Molto formale";
+        } else {
+            if (formality <= 20) return "Informal";
+            if (formality <= 40) return "Semi-informal";
+            if (formality <= 60) return "Balanced";
+            if (formality <= 80) return "Formal";
+            return "Very Formal";
+        }
     }
 
-    private String getCompactUrgencyDesc(int urgency) {
-        if (urgency <= 20) return "Riflessivo";
-        if (urgency <= 40) return "Suggerimento";
-        if (urgency <= 60) return "Invito chiaro";
-        if (urgency <= 80) return "Urgenza strategica";
-        return "Urgenza massima";
+    private String getCompactUrgencyDesc(int urgency, String language) {
+    	 if ("it".equals(language)) {
+    	        if (urgency <= 20) return "Riflessivo";
+    	        if (urgency <= 40) return "Suggerimento";
+    	        if (urgency <= 60) return "Invito chiaro";
+    	        if (urgency <= 80) return "Urgenza strategica";
+    	        return "Urgenza massima";
+    	    } else {
+    	        if (urgency <= 20) return "Reflective";
+    	        if (urgency <= 40) return "Suggestion";
+    	        if (urgency <= 60) return "Clear Invitation";
+    	        if (urgency <= 80) return "Strategic Urgency";
+    	        return "Maximum Urgency";
+    	    }
     }
 
     private JsonNode extractContentNode(JsonNode root) {

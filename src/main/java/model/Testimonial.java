@@ -56,6 +56,9 @@ public class Testimonial {
 
     private LocalDateTime createdAt = LocalDateTime.now();
 
+    @Column(name = "language")
+    private String language = "it";
+    
 	public Long getId() {
 		return id;
 	}
@@ -135,6 +138,14 @@ public class Testimonial {
 
 	public void setCallToActionVersions(List<String> callToActionVersions) {
 		this.callToActionVersions = callToActionVersions;
+	}
+
+	public String getLanguage() {
+		return language;
+	}
+
+	public void setLanguage(String language) {
+		this.language = language;
 	}
 
    
