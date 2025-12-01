@@ -15,10 +15,12 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import DTO.AnalyzeWebsiteRequest;
 import DTO.BrandProfileDTO;
 import DTO.UserDTO;
 import Service.BrandProfileService;
 import Service.UserService;
+import Service.WebsiteAnalysisService;
 import model.BrandProfile;
 import model.User;
 
@@ -31,6 +33,9 @@ public class BrandProfileController {
     
     @Autowired
     private UserService userService;
+    
+    @Autowired
+    private WebsiteAnalysisService websiteAnalysisService;
 
     @GetMapping
     public ResponseEntity<List<BrandProfile>> getUserBrandProfiles(Authentication auth) {
@@ -84,4 +89,37 @@ public class BrandProfileController {
         brandProfileService.deleteBrandProfile(id);
         return ResponseEntity.noContent().build();
     }
+    
+    @PostMapping("/analyze-website")
+    public ResponseEntity<BrandProfile> analyzeWebsiteAndCreateBrand(
+            @RequestBody AnalyzeWebsiteRequest request,
+            Authentication auth) {
+        
+        UserDTO principal = (UserDTO) auth.getPrincipal();
+        User user = userService.findById(Long.parseLong(principal.getId())).orElseThrow();
+        
+        try {
+            // Verifica limite brand
+       //     long currentBrandsCount = brandProfileService.countByUser(user);
+         //   if (currentBrandsCount >= user.getMaxBrands()) {
+          //      return ResponseEntity.badRequest().body(null);
+           // }
+            
+            BrandProfile profile = websiteAnalysisService.analyzeWebsiteAndCreateBrand(
+                request.getWebsiteUrl(), 
+                request.getLanguage()
+            );
+            
+            // Associa il brand all'utente
+            profile.setUser(user);
+            
+            BrandProfile savedProfile = brandProfileService.save(profile);
+            return ResponseEntity.ok(savedProfile);
+            
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(null);
+        }
+    }
+
+ 
 }

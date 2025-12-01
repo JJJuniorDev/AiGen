@@ -66,13 +66,35 @@ public class BrandProfileService {
         return brandRepository.save(profile);
     }
 
-	public BrandProfile updateBrandProfile(Long id, BrandProfileDTO dto) {
-		// TODO Auto-generated method stub
-		return null;
-	}
+    public BrandProfile updateBrandProfile(Long id, BrandProfileDTO dto) {
+        BrandProfile existing = brandRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Brand non trovato"));
+        
+        // Aggiorna i campi
+        existing.setBrandName(dto.getBrandName());
+        existing.setTone(dto.getTone());
+        existing.setPreferredKeywords(dto.getPreferredKeywords());
+        existing.setAvoidedWords(dto.getAvoidedWords());
+        existing.setBrandDescription(dto.getBrandDescription());
+        existing.setTargetAudience(dto.getTargetAudience());
+        existing.setBrandValues(dto.getBrandValues());
+        existing.setTagline(dto.getTagline());
+        existing.setDefaultHashtags(dto.getDefaultHashtags());
+        existing.setVisualStyle(dto.getVisualStyle());
+        existing.setColorPalette(dto.getColorPalette());
+        existing.setUpdatedAt(LocalDateTime.now());
+        
+        return brandRepository.save(existing);
+    }
 
-	public void deleteBrandProfile(Long id) {
-		// TODO Auto-generated method stub
-		
-	}
+    public void deleteBrandProfile(Long id) {
+        if (!brandRepository.existsById(id)) {
+            throw new RuntimeException("Brand non trovato");
+        }
+        brandRepository.deleteById(id);
+    }
+    
+    public long countByUser(User user) {
+        return brandRepository.countByUser(user);
+    }
 }

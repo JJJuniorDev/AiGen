@@ -831,4 +831,118 @@ public class LLMService {
             "Unisciti a percorso di eccellenza e innovazione"
         );
     }
+    
+    public String callGroqAPIForAnalysis(String prompt, String phase, int maxTokens) {
+        System.out.println("🔄 " + phase + ": Invio richiesta analisi...");
+        
+        RestTemplate restTemplate = new RestTemplate();
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(groqApiKey);
+
+        Map<String, Object> body = Map.of(
+            "model", "llama-3.3-70b-versatile",
+            "messages", new Object[]{
+                Map.of("role", "system", "content", buildAnalysisSystemPrompt()),
+                Map.of("role", "user", "content", prompt)
+            },
+            "temperature", 0.3, // Più basso per analisi più precise
+            "max_tokens", maxTokens,
+            "top_p", 0.9,
+            "response_format", Map.of("type", "json_object")
+        );
+
+        try {
+            HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
+            ResponseEntity<Map> response = restTemplate.exchange(GROQ_URL, HttpMethod.POST, request, Map.class);
+            
+            if (response.getBody() == null || !response.getBody().containsKey("choices")) {
+                throw new RuntimeException("Risposta API vuota");
+            }
+            
+            String content = (String) ((Map) ((Map) ((List<?>) response.getBody().get("choices")).get(0)).get("message")).get("content");
+            System.out.println("✅ " + phase + ": Successo - " + content.length() + " caratteri generati");
+            
+            return content;
+            
+        } catch (Exception e) {
+            System.err.println("❌ Errore in " + phase + ": " + e.getMessage());
+            throw new RuntimeException("Fallita fase: " + phase, e);
+        }
+    }
+
+    private String buildAnalysisSystemPrompt() {
+        return """
+            SEI UN ESPERTO DI ANALISI BRAND E MARKETING.
+            
+            OBIETTIVO: Analizzare contenuti di siti web e creare profili brand accurati.
+            
+            REGOLE:
+            - Basati SOLO sul contenuto fornito
+            - Sii preciso e oggettivo
+            - Restituisci SEMPRE JSON valido
+            - Non inventare informazioni non presenti nel contenuto
+            
+            FORMATO OUTPUT: JSON strutturato come richiesto.
+            """;
+    }
+    
+    
+    
+    
+    public String callContentAssistantAPI(String prompt) {
+        System.out.println("🤖 Content Assistant - Invio richiesta AI...");
+        
+        RestTemplate restTemplate = new RestTemplate();
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(groqApiKey);
+
+        Map<String, Object> body = Map.of(
+            "model", "llama-3.3-70b-versatile",
+            "messages", new Object[]{
+                Map.of("role", "system", "content", buildAssistantSystemPrompt()),
+                Map.of("role", "user", "content", prompt)
+            },
+            "temperature", 0.3, // Basso per analisi più consistenti
+            "max_tokens", 2000,
+            "top_p", 0.9,
+            "response_format", Map.of("type", "json_object")
+        );
+
+        try {
+            HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
+            ResponseEntity<Map> response = restTemplate.exchange(GROQ_URL, HttpMethod.POST, request, Map.class);
+            
+            if (response.getBody() == null || !response.getBody().containsKey("choices")) {
+                throw new RuntimeException("Risposta API vuota");
+            }
+            
+            String content = (String) ((Map) ((Map) ((List<?>) response.getBody().get("choices")).get(0)).get("message")).get("content");
+            System.out.println("✅ Content Assistant - Analisi completata");
+            
+            return content;
+            
+        } catch (Exception e) {
+            System.err.println("❌ Errore Content Assistant API: " + e.getMessage());
+            throw new RuntimeException("Fallita analisi assistant", e);
+        }
+    }
+
+    private String buildAssistantSystemPrompt() {
+        return """
+            SEI UN ESPERTO ASSISTENTE DI CONTENT MARKETING.
+            
+            OBIETTIVO: Analizzare contenuti e fornire feedback costruttivi, specifici e azionabili.
+            
+            REGOLE ASSOLUTE:
+            - Fornisci SOLO analisi basate sul contesto fornito
+            - Sii costruttivo e professionale
+            - Suggerimenti devono essere concreti e implementabili
+            - Restituisci SEMPRE JSON valido nel formato richiesto
+            - Non inventare informazioni non presenti nel contesto
+            
+            FOCUS: Qualità contenuto, allineamento brand, engagement potenziale, ottimizzazione piattaforma.
+            """;
+    } 
 }
