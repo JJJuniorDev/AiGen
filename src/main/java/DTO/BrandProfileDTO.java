@@ -16,7 +16,13 @@ public class BrandProfileDTO {
     private List<String> defaultHashtags;
     private String visualStyle;
     private String colorPalette;
-   
+    private String missionStatement;
+    private String visionStatement;
+    private String brandArchetype;
+    private List<String> preferredWords;
+    private List<String> competitiveDifferentials;
+    private String industryCategory;
+    private String voiceDescription;
     
     
     
@@ -89,6 +95,48 @@ public class BrandProfileDTO {
 	}
 	public void setColorPalette(String colorPalette) {
 		this.colorPalette = colorPalette;
+	}
+	public String getMissionStatement() {
+		return missionStatement;
+	}
+	public void setMissionStatement(String missionStatement) {
+		this.missionStatement = missionStatement;
+	}
+	public String getVisionStatement() {
+		return visionStatement;
+	}
+	public void setVisionStatement(String visionStatement) {
+		this.visionStatement = visionStatement;
+	}
+	public String getBrandArchetype() {
+		return brandArchetype;
+	}
+	public void setBrandArchetype(String brandArchetype) {
+		this.brandArchetype = brandArchetype;
+	}
+	public List<String> getPreferredWords() {
+		return preferredWords;
+	}
+	public void setPreferredWords(List<String> preferredWords) {
+		this.preferredWords = preferredWords;
+	}
+	public List<String> getCompetitiveDifferentials() {
+		return competitiveDifferentials;
+	}
+	public void setCompetitiveDifferentials(List<String> competitiveDifferentials) {
+		this.competitiveDifferentials = competitiveDifferentials;
+	}
+	public String getIndustryCategory() {
+		return industryCategory;
+	}
+	public void setIndustryCategory(String industryCategory) {
+		this.industryCategory = industryCategory;
+	}
+	public String getVoiceDescription() {
+		return voiceDescription;
+	}
+	public void setVoiceDescription(String voiceDescription) {
+		this.voiceDescription = voiceDescription;
 	}
 	
     

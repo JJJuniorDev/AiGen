@@ -1,6 +1,7 @@
 package model;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -18,6 +19,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 
 @Entity
@@ -75,8 +77,57 @@ public class BrandProfile {
     
     private String positioning;
     
+    @Column(columnDefinition = "TEXT")
+    private String missionStatement;
+    
+    @Column(columnDefinition = "TEXT")
+    private String visionStatement;
+    
+    @Column(name = "brand_archetype")
+    private String brandArchetype; 
+    
+    @ElementCollection
+    @CollectionTable(name = "brand_words_to_use", joinColumns = @JoinColumn(name = "brand_profile_id"))
+    private List<String> preferredWords; // NUOVO: parole da usare frequentemente
+    
+    @Column(columnDefinition = "TEXT")
+    private String competitiveDifferentials;
+    
+    @Column(name = "industry_category")
+    private String industryCategory;
+    
+    @Column(name = "voice_description", columnDefinition = "TEXT")
+    private String voiceDescription;
     
     
+    
+    // === METODI HELPER ===
+    @PreUpdate
+    public void preUpdate() {
+        this.updatedAt = LocalDateTime.now();
+    }
+    
+    public List<String> getCompetitiveDifferentialsList() {
+        if (competitiveDifferentials == null || competitiveDifferentials.isEmpty()) {
+            return new ArrayList<>();
+        }
+        return Arrays.asList(competitiveDifferentials.split(","));
+    }
+    
+    public void setCompetitiveDifferentialsList(List<String> differentials) {
+        this.competitiveDifferentials = String.join(",", differentials);
+    }
+    
+    public List<String> getColorPaletteList() {
+        if (colorPalette == null || colorPalette.isEmpty()) {
+            return Arrays.asList("#000000", "#FFFFFF", "#007BFF");
+        }
+        return Arrays.asList(colorPalette.split(","));
+    }
+    
+    public void setColorPaletteList(List<String> colors) {
+        this.colorPalette = String.join(",", colors);
+    }
     
     
 	public Long getId() {
@@ -180,6 +231,48 @@ public class BrandProfile {
 	}
 	public void setPositioning(String positioning) {
 		this.positioning = positioning;
+	}
+	public String getMissionStatement() {
+		return missionStatement;
+	}
+	public void setMissionStatement(String missionStatement) {
+		this.missionStatement = missionStatement;
+	}
+	public String getVisionStatement() {
+		return visionStatement;
+	}
+	public void setVisionStatement(String visionStatement) {
+		this.visionStatement = visionStatement;
+	}
+	public String getBrandArchetype() {
+		return brandArchetype;
+	}
+	public void setBrandArchetype(String brandArchetype) {
+		this.brandArchetype = brandArchetype;
+	}
+	public List<String> getPreferredWords() {
+		return preferredWords;
+	}
+	public void setPreferredWords(List<String> preferredWords) {
+		this.preferredWords = preferredWords;
+	}
+	public String getCompetitiveDifferentials() {
+		return competitiveDifferentials;
+	}
+	public void setCompetitiveDifferentials(String competitiveDifferentials) {
+		this.competitiveDifferentials = competitiveDifferentials;
+	}
+	public String getIndustryCategory() {
+		return industryCategory;
+	}
+	public void setIndustryCategory(String industryCategory) {
+		this.industryCategory = industryCategory;
+	}
+	public String getVoiceDescription() {
+		return voiceDescription;
+	}
+	public void setVoiceDescription(String voiceDescription) {
+		this.voiceDescription = voiceDescription;
 	}
     
     
