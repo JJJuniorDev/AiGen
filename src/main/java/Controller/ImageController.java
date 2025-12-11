@@ -31,10 +31,26 @@ public class ImageController {
     
     @PostMapping("/generate")
     public ResponseEntity<?> generateSingleImage(@RequestBody SocialImageRequest request) {
+    	 log.info("📨 Ricevuta richiesta - Prompt: {}", request.getPrompt());
+    	 boolean isEditMode = request.getBaseImage() != null 
+                 && !request.getBaseImage().isEmpty();
         try {
-            SocialImageResponse response = imageGenerationService.generateSocialImage(request);
-            return ResponseEntity.ok(response);
+        	 SocialImageResponse response;
+        	 log.info("✏️ Modifica immagine esistente per {}", request.getBrandName());
+        	    log.info("📝 Nuovo prompt: {}", request.getPrompt());
+        	    log.info("🎨 Stile richiesto: {}", request.getStyle()); // Aggiungi questo log
+        	    log.info("🖼️ Base64 presente: {}", request.getBaseImage() != null && !request.getBaseImage().isEmpty());
+        	    log.info("🔢 Numero edit: {}", request.getEditCount());
+        	 if (isEditMode) {
+                 log.info("🔄 Modalità EDIT - Immagine base presente");
+                 response = imageGenerationService.editSocialImage(request);
+             } else {
+                 log.info("🆕 Modalità NEW - Generazione da testo");
+                 response = imageGenerationService.generateSocialImage(request);
+             }
+        	 return ResponseEntity.ok(response);
         } catch (Exception e) {
+        	 log.error("❌ Errore nel controller: {}", e.getMessage(), e);
             Map<String, String> error = new HashMap<>();
             error.put("error", e.getMessage());
             return ResponseEntity.badRequest().body(error);

@@ -2,13 +2,16 @@
 package DTO;
 
 public class SocialImageRequest {
+	private String prompt;
     private String content;
     private String platform;
     private String brandName;
     private String primaryColor;
     private boolean includeText;
     private String style; 
-    
+    private Integer editCount;
+    private String baseImage;
+    private Double imageStrength;
     // Costruttori
     public SocialImageRequest() {}
     
@@ -34,6 +37,38 @@ public class SocialImageRequest {
 
 	public void setStyle(String style) {
 		this.style = style;
+	}
+
+	public String getPrompt() {
+		return prompt;
+	}
+
+	public void setPrompt(String prompt) {
+		this.prompt = prompt;
+	}
+
+	public Integer getEditCount() {
+		return editCount;
+	}
+
+	public void setEditCount(Integer editCount) {
+		this.editCount = editCount;
+	}
+
+	public String getBaseImage() {
+		return baseImage;
+	}
+
+	public void setBaseImage(String baseImage) {
+		this.baseImage = baseImage;
+	}
+
+	public Double getImageStrength() {
+		return imageStrength;
+	}
+
+	public void setImageStrength(Double imageStrength) {
+		this.imageStrength = imageStrength;
 	}
     
     

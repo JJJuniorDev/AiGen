@@ -1,6 +1,13 @@
 package Service;
 
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.util.*;
+
+import javax.imageio.ImageIO;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -11,6 +18,8 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import DTO.SocialImageBatchRequest;
 import DTO.SocialImageRequest;
 import DTO.SocialImageResponse;
@@ -20,6 +29,20 @@ public class ImageGenerationService {
 
     private static final Logger log = LoggerFactory.getLogger(ImageGenerationService.class);
     
+    private static final Map<String, Double> EDIT_STRENGTH_MAP = Map.of(
+    	    "subtle", 0.65,      // Modifica sottile
+    	    "normal", 0.35,      // Modifica normale (default)
+    	    "strong", 0.15,      // Modifica forte
+    	    "transform", 0.1     // Trasformazione radicale
+    	);
+
+    	private static final Set<String> VALID_STYLES = Set.of(
+    	    "3d-model", "analog-film", "anime", "cinematic", "comic-book",
+    	    "digital-art", "enhance", "fantasy-art", "isometric", "line-art",
+    	    "low-poly", "modeling-compound", "neon-punk", "origami", "photographic",
+    	    "pixel-art", "tile-texture"
+    	);
+    	
     @Value("${stability.api.key:}")
     private String stabilityApiKey;
     
@@ -31,9 +54,114 @@ public class ImageGenerationService {
     
     private final RestTemplate restTemplate = new RestTemplate();
     
-    public ImageGenerationService() {
-        // Costruttore vuoto - non serve LLMService
+    // ===================================================================
+    // METODI PRINCIPALI DI GENERAZIONE
+    // ===================================================================
+    
+    /**
+     * Genera una nuova immagine da testo (text-to-image)
+     */
+    public SocialImageResponse generateSocialImage(SocialImageRequest request) {
+        log.info("🎨 Generazione NUOVA immagine per {}", request.getBrandName());
+        log.info("📝 Prompt ricevuto (ITALIANO): {}", request.getPrompt());
+        
+        try {
+        	
+        	  String englishPrompt = translateItalianToEnglish(request.getPrompt());
+              log.info("🌐 Prompt tradotto (INGLESE): {}", englishPrompt);
+              request.setPrompt(englishPrompt);
+            // 1. Arricchisci il prompt con dettagli tecnici
+            String enhancedPrompt = enhancePromptForAI(request);
+            log.info("✨ Prompt arricchito: {}", enhancedPrompt);
+            
+            // 2. Genera immagine AI in modalità text-to-image
+            String imageBase64 = generateImageFromText(
+                enhancedPrompt, 
+                request.getPlatform(),
+                request.getStyle()
+            );
+            
+            // 3. Crea e restituisci risposta
+            return createResponse(
+                request, 
+                imageBase64, 
+                enhancedPrompt, 
+                false, 
+                null
+            );
+            
+        } catch (Exception e) {
+            log.error("❌ Errore generazione immagine: {}", e.getMessage(), e);
+            throw new RuntimeException("Impossibile generare l'immagine: " + e.getMessage());
+        }
     }
+    
+    /**
+     * Modifica un'immagine esistente (image-to-image)
+     */
+    public SocialImageResponse editSocialImage(SocialImageRequest request) {
+        log.info("✏️ Modifica immagine esistente per {}", request.getBrandName());
+        log.info("📝 Nuovo prompt (ITALIANO): {}", request.getPrompt());
+        
+        try {
+            // Validazione: deve esserci un'immagine base da modificare
+            if (request.getBaseImage() == null || request.getBaseImage().isEmpty()) {
+                throw new IllegalArgumentException("Base image is required for editing");
+            }
+            
+            String englishPrompt = translateItalianToEnglish(request.getPrompt());
+            log.info("🌐 Prompt tradotto per modifica (INGLESE): {}", englishPrompt);
+            request.setPrompt(englishPrompt);
+            
+            // 1. Arricchisci il prompt con dettagli tecnici
+            String enhancedPrompt = enhancePromptForAI(request);
+            log.info("✨ Prompt modifica arricchito: {}", enhancedPrompt);
+            
+            Double imageStrength = determineOptimalImageStrength(request.getPrompt(), enhancedPrompt);
+            log.info("⚙️ Image strength ottimale: {} (calcolato automaticamente)", imageStrength);
+            
+            // 2. Decodifica l'immagine base64 esistente
+            byte[] initImageBytes = Base64.getDecoder()
+                .decode(request.getBaseImage().replaceFirst("data:image/[^;]+;base64,", ""));
+            
+            log.info("🖼️ Immagine base ricevuta: {} bytes", initImageBytes.length);
+           
+            // 4. Genera immagine in modalità image-to-image
+            String imageBase64 = generateImageFromImage(
+                enhancedPrompt,
+                initImageBytes,
+                request.getPlatform(),
+                request.getStyle(),
+                imageStrength
+            );
+            
+            // 5. Incrementa il contatore modifiche
+            Integer editCount = request.getEditCount() != null 
+                              ? request.getEditCount() + 1 
+                              : 1;
+            
+            // 6. Crea e restituisci risposta
+            SocialImageResponse response = createResponse(
+                request, 
+                imageBase64, 
+                enhancedPrompt, 
+                true, 
+                editCount
+            );
+            
+            log.info("✅ Immagine modificata (Iterazione #{}, strength: {})", response.getEditCount(), imageStrength);
+            
+            return response;
+            
+        } catch (Exception e) {
+            log.error("❌ Errore modifica immagine: {}", e.getMessage(), e);
+            throw new RuntimeException("Impossibile modificare l'immagine: " + e.getMessage());
+        }
+    }
+    
+    // ===================================================================
+    // METODI PER BATCH GENERATION (per compatibilità)
+    // ===================================================================
     
     public List<SocialImageResponse> generateBatchImages(SocialImageBatchRequest request) {
         log.info("🎨 Generazione batch di {} immagini per {}", 
@@ -41,26 +169,21 @@ public class ImageGenerationService {
         
         List<SocialImageResponse> images = new ArrayList<>();
         
-        // Genera immagine per ogni post
         for (int i = 0; i < request.getPosts().size(); i++) {
             try {
                 String postContent = request.getPosts().get(i);
                 
-                // Crea richiesta singola
                 SocialImageRequest singleRequest = new SocialImageRequest();
-                singleRequest.setContent(postContent);
+                singleRequest.setPrompt(postContent); // Usa setPrompt invece di setContent
                 singleRequest.setPlatform(request.getPlatform());
                 singleRequest.setBrandName(request.getBrandName());
                 singleRequest.setStyle(request.getStyle());
-                singleRequest.setIncludeText(request.isIncludeText());
                 
-                // Genera immagine (SOLO Base64, NO upload automatico)
                 SocialImageResponse response = generateSocialImage(singleRequest);
                 images.add(response);
                 
                 log.info("✅ Immagine {} generata (Base64)", i + 1);
                 
-                // Piccola pausa per non sovraccaricare le API
                 if (i < request.getPosts().size() - 1) {
                     Thread.sleep(1000);
                 }
@@ -74,86 +197,66 @@ public class ImageGenerationService {
         return images;
     }
     
+    // ===================================================================
+    // METODI PRIVATI DI SUPPORTO
+    // ===================================================================
+    
     /**
-     * Genera singola immagine social (restituisce Base64 direttamente)
+     * Arricchisce il prompt con dettagli tecnici per migliorare i risultati AI
      */
-    public SocialImageResponse generateSocialImage(SocialImageRequest request) {
-        log.info("🎨 Generazione immagine per {}", request.getBrandName());
+    private String enhancePromptForAI(SocialImageRequest request) {
+        StringBuilder promptBuilder = new StringBuilder();
         
-        try {
-            // 1. Crea prompt ottimizzato
-            String imagePrompt = createEnhancedPrompt(request);
-            log.info("📝 Prompt: {}", imagePrompt);
-            
-            // 2. Genera immagine AI e ottieni Base64
-            String imageBase64 = generateAIImageBase64(imagePrompt, request);
-            
-            // 3. Crea risposta con Base64 (NO upload automatico a Cloudinary)
-            SocialImageResponse response = new SocialImageResponse();
-            response.setImageBase64(imageBase64); // Imposta Base64
-            response.setImageUrl(null); // URL Cloudinary vuoto
-            response.setPromptUsed(imagePrompt);
-            response.setPlatform(request.getPlatform());
-            response.setDimensions(getDimensionsForPlatform(request.getPlatform()));
-            response.setGeneratedAt(new Date());
-            response.setSavedToCloudinary(false); // Flag: non salvato su Cloudinary
-            response.setTemporaryId(UUID.randomUUID().toString()); // ID temporaneo
-            
-            log.info("✅ Immagine generata (Base64, {} chars)", imageBase64.length());
-            
-            return response;
-            
-        } catch (Exception e) {
-            log.error("❌ Errore generazione immagine: {}", e.getMessage());
-            throw new RuntimeException("Impossibile generare l'immagine: " + e.getMessage());
+        // 1. Prompt principale dall'utente (OBBLIGATORIO)
+        promptBuilder.append(request.getPrompt());
+        
+        String style = request.getStyle().toLowerCase();
+        
+        if (!VALID_STYLES.contains(style)) {
+            log.warn("⚠️ Stile '{}' non valido, uso 'cinematic' come fallback", style);
+            style = "cinematic";
         }
+        
+        // 2. Aggiungi stile se specificato
+       
+            promptBuilder.append(", ").append(request.getStyle()).append(" style");
+        
+        
+        // 3. Aggiungi ottimizzazione per piattaforma
+        promptBuilder.append(", optimized for ").append(request.getPlatform()).append(" social media");
+        
+        // 4. Qualità e dettagli tecnici (fissi)
+        promptBuilder.append(", high quality, detailed, professional");
+        
+        return promptBuilder.toString();
     }
     
     /**
-     * 🔥 NUOVO METODO: Genera immagine e restituisce Base64 (senza upload)
+     * Genera un'immagine da testo (text-to-image)
      */
-    private String generateAIImageBase64(String prompt, SocialImageRequest request) {
+    private String generateImageFromText(String prompt, String platform, String style) {
         try {
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.set("Authorization", "Bearer " + stabilityApiKey);
-            headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
+            HttpHeaders headers = createStabilityHeaders();
             
-            // Corpo richiesta
-            Map<String, Object> requestBody = new HashMap<>();
+            Map<String, Object> requestBody = createBaseRequestBody(prompt, platform);
             
-            // Prompts
-            List<Map<String, Object>> textPrompts = new ArrayList<>();
+            // Imposta stile se specificato
+            if (style != null && !style.isEmpty()) {
+                String stylePreset = style.toLowerCase();
+                stylePreset =stylePreset;
+                if (VALID_STYLES.contains(stylePreset)) {
+                    requestBody.put("style_preset", stylePreset);
+                    log.info("🎨 Stile applicato: {}", stylePreset);
+                } else {
+                    log.warn("⚠️ Stile '{}' non supportato, uso default", stylePreset);
+                }
+            }
             
-            Map<String, Object> positivePrompt = new HashMap<>();
-            positivePrompt.put("text", prompt);
-            positivePrompt.put("weight", 1.0);
-            textPrompts.add(positivePrompt);
-            
-            Map<String, Object> negativePrompt = new HashMap<>();
-            negativePrompt.put("text", "ugly, blurry, low quality, text, watermark, signature, letters, words");
-            negativePrompt.put("weight", -1.0);
-            textPrompts.add(negativePrompt);
-            
-            requestBody.put("text_prompts", textPrompts);
-            
-            // Dimensioni
-            Map<String, Integer> dimensions = getDimensionsForPlatform(request.getPlatform());
-            requestBody.put("width", dimensions.get("width"));
-            requestBody.put("height", dimensions.get("height"));
-            
-            // Parametri qualità
-            requestBody.put("cfg_scale", 7);
-            requestBody.put("samples", 1);
-            requestBody.put("steps", 30);
-            requestBody.put("style_preset", "photographic");
             
             HttpEntity<Map<String, Object>> requestEntity = new HttpEntity<>(requestBody, headers);
             
-            log.info("🔄 Invio a Stability AI... Dimensioni: {}x{}", 
-                     dimensions.get("width"), dimensions.get("height"));
+            log.info("🔄 Text-to-image a Stability AI...");
             
-            // Chiama API
             ResponseEntity<Map> response = restTemplate.exchange(
                 "https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image",
                 HttpMethod.POST,
@@ -161,34 +264,184 @@ public class ImageGenerationService {
                 Map.class
             );
             
-            // Estrai Base64 dalla risposta
-            Map<String, Object> responseBody = response.getBody();
-            if (responseBody != null && responseBody.containsKey("artifacts")) {
-                List<Map<String, Object>> artifacts = (List<Map<String, Object>>) responseBody.get("artifacts");
-                if (!artifacts.isEmpty() && artifacts.get(0).containsKey("base64")) {
-                    String base64Image = (String) artifacts.get(0).get("base64");
-                    log.info("✅ Base64 ricevuto ({} chars)", base64Image.length());
-                    return base64Image;
-                }
-            }
-            
-            throw new RuntimeException("Nessuna immagine Base64 generata dall'API");
+            return extractBase64FromResponse(response);
             
         } catch (Exception e) {
-            log.error("❌ Errore Stability AI: {}", e.getMessage());
-            throw new RuntimeException("Errore generazione immagine AI");
+            log.error("❌ Errore text-to-image: {}", e.getMessage());
+            throw new RuntimeException("Errore generazione immagine da testo: " + e.getMessage());
+        }
+    }
+    
+    private String generateImageFromImage(String prompt, byte[] initImageBytes, 
+            String platform, String style, 
+            double imageStrength) {
+        try {
+            // 1. HEADERS per multipart/form-data
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+            headers.set("Authorization", "Bearer " + stabilityApiKey);
+            headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
+
+            // 2. Creazione del body multipart
+            MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+
+            byte[] processedImageBytes = compressImageIfNeeded(initImageBytes, 5_200_000L);
+            
+            // Parte 1: L'immagine come file
+            ByteArrayResource imageResource = new ByteArrayResource(processedImageBytes) {
+                @Override
+                public String getFilename() {
+                    return "init-image.png";
+                }
+            };
+            body.add("init_image", imageResource);
+
+            // Parte 2: PARAMETRI PRINCIPALI
+            // Per image-to-image, i parametri vanno inviati come campi separati, NON come JSON annidato
+            
+            // Aggiungi il prompt direttamente come stringa
+            body.add("text_prompts[0][text]", prompt);
+            body.add("text_prompts[0][weight]", "1.0");
+            
+            // Prompt negativo opzionale (ma consigliato)
+            body.add("text_prompts[1][text]", "ugly, blurry, low quality, text, watermark, signature");
+            body.add("text_prompts[1][weight]", "-1.0");
+
+            // Parte 3: Altri parametri richiesti
+          
+            body.add("image_strength", String.valueOf(imageStrength));
+            body.add("cfg_scale", "7");
+            body.add("samples", "1");
+            body.add("steps", "30");
+
+            // Stile se specificato
+            if (style != null && !style.isEmpty()) {
+                body.add("style_preset", style.toLowerCase());
+            }
+
+            // Log dettagliato
+            log.info("🔄 Image-to-image a Stability AI (strength: {})...", imageStrength);
+            log.info("📤 Dimensione immagine: {} bytes", initImageBytes.length);
+            log.info("📝 Prompt inviato: {}", prompt);
+       
+            log.info("🔧 Parametri: cfg_scale=7, steps=30, samples=1");
+
+            // 3. Crea la richiesta
+            HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
+
+            // 4. Invia la richiesta
+            ResponseEntity<Map> response = restTemplate.exchange(
+                "https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/image-to-image",
+                HttpMethod.POST,
+                requestEntity,
+                Map.class
+            );
+
+            return extractBase64FromResponse(response);
+
+        } catch (Exception e) {
+            log.error("❌ Errore image-to-image: {}", e.getMessage(), e);
+            throw new RuntimeException("Errore modifica immagine: " + e.getMessage());
         }
     }
     
     /**
-     * 🔥 NUOVO METODO: Salva un'immagine Base64 su Cloudinary (su richiesta)
+     * Crea gli headers per le chiamate a Stability AI
+     */
+    private HttpHeaders createStabilityHeaders() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("Authorization", "Bearer " + stabilityApiKey);
+        headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
+        return headers;
+    }
+    
+    /**
+     * Crea il body base per le richieste a Stability AI
+     */
+    private Map<String, Object> createBaseRequestBody(String prompt, String platform) {
+        Map<String, Object> requestBody = new HashMap<>();
+        
+        // Prompts
+        List<Map<String, Object>> textPrompts = new ArrayList<>();
+        
+        Map<String, Object> positivePrompt = new HashMap<>();
+        positivePrompt.put("text", prompt);
+        positivePrompt.put("weight", 1.0);
+        textPrompts.add(positivePrompt);
+        
+        Map<String, Object> negativePrompt = new HashMap<>();
+        negativePrompt.put("text", "ugly, blurry, low quality, text, watermark, signature, letters, words, deformed");
+        negativePrompt.put("weight", -1.0);
+        textPrompts.add(negativePrompt);
+        
+        requestBody.put("text_prompts", textPrompts);
+        
+        // Dimensioni
+        Map<String, Integer> dimensions = getDimensionsForPlatform(platform);
+        requestBody.put("width", dimensions.get("width"));
+        requestBody.put("height", dimensions.get("height"));
+        
+        // Parametri qualità
+        requestBody.put("cfg_scale", 7);
+        requestBody.put("samples", 1);
+        requestBody.put("steps", 30);
+        
+        return requestBody;
+    }
+    
+    /**
+     * Estrae l'immagine Base64 dalla risposta di Stability AI
+     */
+    private String extractBase64FromResponse(ResponseEntity<Map> response) {
+        Map<String, Object> responseBody = response.getBody();
+        
+        if (responseBody != null && responseBody.containsKey("artifacts")) {
+            List<Map<String, Object>> artifacts = (List<Map<String, Object>>) responseBody.get("artifacts");
+            if (!artifacts.isEmpty() && artifacts.get(0).containsKey("base64")) {
+                String base64Image = (String) artifacts.get(0).get("base64");
+                log.info("✅ Base64 ricevuto ({} chars)", base64Image.length());
+                return base64Image;
+            }
+        }
+        
+        throw new RuntimeException("Nessuna immagine Base64 generata dall'API");
+    }
+    
+    /**
+     * Crea l'oggetto di risposta standard
+     */
+    private SocialImageResponse createResponse(SocialImageRequest request, 
+                                             String imageBase64, 
+                                             String promptUsed,
+                                             boolean isEdit,
+                                             Integer editCount) {
+        SocialImageResponse response = new SocialImageResponse();
+        response.setImageBase64(imageBase64);
+        response.setImageUrl(null); // Cloudinary URL vuoto (upload opzionale)
+        response.setPromptUsed(promptUsed);
+        response.setPlatform(request.getPlatform());
+        response.setDimensions(getDimensionsForPlatform(request.getPlatform()));
+        response.setGeneratedAt(new Date());
+        response.setSavedToCloudinary(false);
+        response.setTemporaryId(UUID.randomUUID().toString());
+        response.setIsEdit(isEdit);
+        response.setEditCount(editCount);
+        
+        return response;
+    }
+    
+    // ===================================================================
+    // METODI PER CLOUDINARY (UPLOAD OPZIONALE)
+    // ===================================================================
+    
+    /**
+     * Salva un'immagine Base64 su Cloudinary (su richiesta esplicita)
      */
     public SocialImageResponse saveImageToCloudinary(String imageBase64, String platform, String brandName) {
         try {
-            // Decodifica base64
             byte[] imageBytes = Base64.getDecoder().decode(imageBase64);
             
-            // Headers
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.MULTIPART_FORM_DATA);
             
@@ -212,7 +465,6 @@ public class ImageGenerationService {
             
             log.info("☁️ Upload a Cloudinary per {}...", brandName);
             
-            // Invia a Cloudinary
             ResponseEntity<Map> response = restTemplate.exchange(
                 uploadUrl,
                 HttpMethod.POST,
@@ -225,7 +477,6 @@ public class ImageGenerationService {
                 String imageUrl = (String) responseBody.get("secure_url");
                 log.info("✅ Upload completato: {}", imageUrl);
                 
-                // Crea risposta con URL Cloudinary
                 SocialImageResponse savedResponse = new SocialImageResponse();
                 savedResponse.setImageUrl(imageUrl);
                 savedResponse.setPlatform(platform);
@@ -243,205 +494,164 @@ public class ImageGenerationService {
             throw new RuntimeException("Errore upload immagine su Cloudinary");
         }
     }
-
-
-    private String createEnhancedPrompt(SocialImageRequest request) {
-        String platform = request.getPlatform().toLowerCase();
-        String brand = request.getBrandName();
-        String content = request.getContent();
-        
-        // Mappa stili
-        Map<String, String> styleKeywords = new HashMap<>();
-        styleKeywords.put("realistic", "photorealistic, high detail");
-        styleKeywords.put("illustrative", "vector illustration, flat design");
-        styleKeywords.put("minimal", "minimalist, clean, simple");
-        styleKeywords.put("vibrant", "vibrant colors, bold, eye-catching");
-        
-        String requestStyle = request.getStyle(); // Usa un nome diverso
-        String styleKey = (requestStyle != null && !requestStyle.isEmpty()) ? requestStyle : "realistic";
-        String styleDesc = styleKeywords.getOrDefault(styleKey, "professional");
-        
-        // Mappa piattaforme
-        Map<String, String> platformContext = new HashMap<>();
-        platformContext.put("linkedin", "professional business, corporate, networking");
-        platformContext.put("instagram", "aesthetic, trendy, social media, visually appealing");
-        platformContext.put("twitter", "bold, attention-grabbing, conversational");
-        platformContext.put("facebook", "community, friendly, engaging");
-        
-        String platformContextStr = platformContext.getOrDefault(platform, "social media");
-        
-        // Prompt finale
-        return String.format(
-            "%s social media post for %s brand. Content theme: %s. %s style. " +
-            "High quality, professional design, no text overlay, perfect composition. " +
-            "Trending on ArtStation, Behance, Dribbble.",
-            platformContextStr, brand, 
-            content.length() > 100 ? content.substring(0, 100) : content,
-            styleDesc
-        );
-    }
+    
+    // ===================================================================
+    // METODI UTILITY
+    // ===================================================================
     
     /**
-     * Dimensioni per piattaforma
+     * Restituisce le dimensioni ottimali per ogni piattaforma
      */
     private Map<String, Integer> getDimensionsForPlatform(String platform) {
         Map<String, Integer> dimensions = new HashMap<>();
         
         switch (platform.toLowerCase()) {
-        case "linkedin":
-            // LinkedIn: preferisco 1152x896 (1.29:1) o 1216x832 (1.46:1)
-            // L'originale 1200x627 = 1.91:1 → scegliamo 1216x832 = 1.46:1 (vicino)
-            dimensions.put("width", 1216);
-            dimensions.put("height", 832);
-            break;
-        case "twitter":
-            // Twitter: 1200x675 = 1.78:1 → 1344x768 = 1.75:1 (vicino)
-            dimensions.put("width", 1344);
-            dimensions.put("height", 768);
-            break;
-        case "facebook":
-            // Facebook: 1200x630 = 1.90:1 → 1216x832 = 1.46:1 
-            // Oppure 1152x896 = 1.29:1
-            dimensions.put("width", 1216);
-            dimensions.put("height", 832);
-            break;
-        case "instagram":
-        default:
-            // Instagram: quadrato 1080x1080 → 1024x1024
-            dimensions.put("width", 1024);
-            dimensions.put("height", 1024);
-            break;
+            case "linkedin":
+                dimensions.put("width", 1216);
+                dimensions.put("height", 832);
+                break;
+            case "twitter":
+                dimensions.put("width", 1344);
+                dimensions.put("height", 768);
+                break;
+            case "facebook":
+                dimensions.put("width", 1216);
+                dimensions.put("height", 832);
+                break;
+            case "instagram":
+            default:
+                dimensions.put("width", 1024);
+                dimensions.put("height", 1024);
+                break;
+        }
+        
+        log.debug("Dimensioni per {}: {}x{}", platform, dimensions.get("width"), dimensions.get("height"));
+        
+        return dimensions;
     }
     
-    log.debug("Dimensioni SDXL per {}: {}x{}", platform, 
-             dimensions.get("width"), dimensions.get("height"));
-    
-    return dimensions;
-    }
-    
-    /**
-     * Genera immagine con Stability AI
-     */
-    private String generateAIImage(String prompt, SocialImageRequest request) {
+    private String translateItalianToEnglish(String italianText) {
         try {
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.set("Authorization", "Bearer " + stabilityApiKey);
-            headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
-            // Corpo richiesta
-            Map<String, Object> requestBody = new HashMap<>();
+            log.info("🌐 Traduzione italiano → inglese: {}", 
+                     italianText.substring(0, Math.min(50, italianText.length())));
             
-            // Prompts
-            List<Map<String, Object>> textPrompts = new ArrayList<>();
+            // Limita a 500 caratteri (limite MyMemory)
+            String textToTranslate = italianText.length() > 500 
+                ? italianText.substring(0, 500) 
+                : italianText;
             
-            Map<String, Object> positivePrompt = new HashMap<>();
-            positivePrompt.put("text", prompt);
-            positivePrompt.put("weight", 1.0);
-            textPrompts.add(positivePrompt);
+            // Costruisci URL per MyMemory
+            String apiUrl = "https://api.mymemory.translated.net/get" +
+                "?q=" + java.net.URLEncoder.encode(textToTranslate, "UTF-8") +
+                "&langpair=it|en" +
+                "&de=lorenzo.detoma3@gmail.com"; // 👈 Tua email per 50k caratteri
             
-            Map<String, Object> negativePrompt = new HashMap<>();
-            negativePrompt.put("text", "ugly, blurry, low quality, text, watermark, signature, letters, words");
-            negativePrompt.put("weight", -1.0);
-            textPrompts.add(negativePrompt);
-            
-            requestBody.put("text_prompts", textPrompts);
-            
-            // Dimensioni
-            Map<String, Integer> dimensions = getDimensionsForPlatform(request.getPlatform());
-            requestBody.put("width", dimensions.get("width"));
-            requestBody.put("height", dimensions.get("height"));
-            
-            // Parametri qualità
-            requestBody.put("cfg_scale", 7);
-            requestBody.put("samples", 1);
-            requestBody.put("steps", 30);
-            requestBody.put("style_preset", "photographic");
-            
-            HttpEntity<Map<String, Object>> requestEntity = new HttpEntity<>(requestBody, headers);
-            
-            log.info("🔄 Invio a Stability AI... Dimensioni: {}x{}", 
-                     dimensions.get("width"), dimensions.get("height"));
-            
-            // Chiama API
-            ResponseEntity<Map> response = restTemplate.exchange(
-                "https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image",
-                HttpMethod.POST,
-                requestEntity,
-                Map.class
-            );
-            
-            // Estrai immagine base64
+            // Chiama MyMemory
+            ResponseEntity<Map> response = restTemplate.getForEntity(apiUrl, Map.class);
             Map<String, Object> responseBody = response.getBody();
-            if (responseBody != null && responseBody.containsKey("artifacts")) {
-                List<Map<String, Object>> artifacts = (List<Map<String, Object>>) responseBody.get("artifacts");
-                if (!artifacts.isEmpty()) {
-                    String base64Image = (String) artifacts.get(0).get("base64");
-                    
-                    // Upload su Cloudinary
-                    return uploadToCloudinary(base64Image, request.getPlatform());
+            
+            if (responseBody != null && 
+                "200".equals(String.valueOf(responseBody.get("responseStatus"))) &&
+                responseBody.get("responseData") != null) {
+                
+                Map<String, Object> responseData = (Map<String, Object>) responseBody.get("responseData");
+                String translatedText = (String) responseData.get("translatedText");
+                
+                if (translatedText != null && !translatedText.isEmpty()) {
+                    log.info("✅ Traduzione completata: {} → {}", 
+                             textToTranslate.substring(0, Math.min(30, textToTranslate.length())),
+                             translatedText.substring(0, Math.min(30, translatedText.length())));
+                    return translatedText;
                 }
             }
             
-            throw new RuntimeException("Nessuna immagine generata dall'API");
+            log.warn("⚠️ Traduzione fallita, uso testo originale");
+            return italianText;
             
         } catch (Exception e) {
-            log.error("❌ Errore Stability AI: {}", e.getMessage());
-            throw new RuntimeException("Errore generazione immagine AI");
+            log.error("❌ Errore traduzione: {}", e.getMessage());
+            return italianText; // Fallback a italiano
         }
     }
     
-    /**
-     * Upload su Cloudinary
-     */
-    private String uploadToCloudinary(String base64Image, String platform) {
-        try {
-            // Decodifica base64
-            byte[] imageBytes = Base64.getDecoder().decode(base64Image);
-            
-            // Headers
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.MULTIPART_FORM_DATA);
-            
-            MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
-            
-            ByteArrayResource resource = new ByteArrayResource(imageBytes) {
-                @Override
-                public String getFilename() {
-                    return "social-post-" + platform + "-" + System.currentTimeMillis() + ".png";
-                }
-            };
-            
-            body.add("file", resource);
-            body.add("upload_preset", cloudinaryUploadPreset);
-            body.add("folder", "social_posts");
-            body.add("tags", "ai_generated,social_media," + platform);
-            
-            HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
-            
-            String uploadUrl = "https://api.cloudinary.com/v1_1/" + cloudinaryCloudName + "/image/upload";
-            
-            log.info("☁️ Upload a Cloudinary...");
-            
-            // Invia a Cloudinary
-            ResponseEntity<Map> response = restTemplate.exchange(
-                uploadUrl,
-                HttpMethod.POST,
-                requestEntity,
-                Map.class
-            );
-            
-            Map<String, Object> responseBody = response.getBody();
-            if (responseBody != null && responseBody.containsKey("secure_url")) {
-                String imageUrl = (String) responseBody.get("secure_url");
-                log.info("✅ Upload completato: {}", imageUrl);
-                return imageUrl;
-            }
-            
-            throw new RuntimeException("Nessun URL dall'upload Cloudinary");
-            
-        } catch (Exception e) {
-            log.error("❌ Errore Cloudinary: {}", e.getMessage());
-            throw new RuntimeException("Errore upload immagine su Cloudinary");
+    private byte[] compressImageIfNeeded(byte[] imageBytes, long maxSizeBytes) throws IOException {
+        long currentSize = imageBytes.length;
+        
+        if (currentSize <= maxSizeBytes) {
+            log.info("✅ Immagine entro il limite ({} bytes)", currentSize);
+            return imageBytes;
         }
+
+        log.warn("⚠️ Immagine troppo grande ({} bytes). Provo a comprimere...", currentSize);
+        
+        // 1. Decodifica i bytes in un BufferedImage
+        ByteArrayInputStream bais = new ByteArrayInputStream(imageBytes);
+        BufferedImage image = ImageIO.read(bais);
+        
+        // Riduci le dimensioni se necessario (mantenendo aspect ratio)
+        if (image.getWidth() > 1024 || image.getHeight() > 1024) {
+            int newWidth = Math.min(image.getWidth(), 1024);
+            int newHeight = (int) ((double) newWidth / image.getWidth() * image.getHeight());
+            
+            BufferedImage resized = new BufferedImage(newWidth, newHeight, BufferedImage.TYPE_INT_ARGB);
+            java.awt.Graphics2D g2d = resized.createGraphics();
+            g2d.drawImage(image.getScaledInstance(newWidth, newHeight, java.awt.Image.SCALE_SMOOTH), 0, 0, null);
+            g2d.dispose();
+            image = resized;
+            log.info("📐 Immagine ridimensionata a {}x{}", newWidth, newHeight);
+        }
+        
+        // Compressione ottimizzata
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        ImageIO.write(image, "png", baos);
+        
+        byte[] optimizedBytes = baos.toByteArray();
+        log.info("✅ Dopo ottimizzazione: {} bytes (riduzione: {}%)", 
+                 optimizedBytes.length, 
+                 100 - (optimizedBytes.length * 100 / currentSize));
+        
+        return optimizedBytes;
     }
+    
+    
+    
+    private Double determineOptimalImageStrength(String originalPrompt, String enhancedPrompt) {
+        // Analizza il prompt per capire se richiede cambiamenti radicali
+        String promptLower = enhancedPrompt.toLowerCase();
+        
+        // Parole chiave che indicano cambiamenti radicali
+        Set<String> radicalKeywords = Set.of(
+            "add", "remove", "change", "transform", "completely", "totally",
+            "instead", "different", "new", "create", "make it", "turn into"
+        );
+        
+        // Parole chiave che indicano modifiche sottili
+        Set<String> subtleKeywords = Set.of(
+            "adjust", "slightly", "a bit", "little", "enhance", "improve",
+            "refine", "touch up", "minor", "small"
+        );
+        
+        int radicalCount = 0;
+        int subtleCount = 0;
+        
+        for (String keyword : radicalKeywords) {
+            if (promptLower.contains(keyword)) radicalCount++;
+        }
+        
+        for (String keyword : subtleKeywords) {
+            if (promptLower.contains(keyword)) subtleCount++;
+        }
+        
+        // Logica per determinare la forza
+        if (radicalCount > subtleCount && radicalCount >= 2) {
+            return 0.15; // Modifica forte per cambiamenti radicali
+        } else if (subtleCount > radicalCount) {
+            return 0.65; // Modifica sottile
+        }
+        
+        return 0.35; // Default
+    }
+    
+    
+  
 }

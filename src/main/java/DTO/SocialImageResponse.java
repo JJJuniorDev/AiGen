@@ -13,6 +13,8 @@ public class SocialImageResponse {
     private Date generatedAt;
     private boolean savedToCloudinary = false; // Flag per indicare se è stato fatto upload
     private String temporaryId;
+    private Integer editCount;
+    private Boolean isEdit;
     // Costruttori
     public SocialImageResponse() {}
     
@@ -78,6 +80,26 @@ public class SocialImageResponse {
 	}
 	public void setTemporaryId(String temporaryId) {
 		this.temporaryId = temporaryId;
+	}
+
+
+	public Integer getEditCount() {
+		return editCount;
+	}
+
+
+	public void setEditCount(Integer editCount) {
+		this.editCount = editCount;
+	}
+
+
+	public Boolean getIsEdit() {
+		return isEdit;
+	}
+
+
+	public void setIsEdit(Boolean isEdit) {
+		this.isEdit = isEdit;
 	}
     
    
